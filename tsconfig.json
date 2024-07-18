@@ -1,0 +1,18 @@
+{
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "declaration": true,
+    "strict": true,
+    "allowJs": true,
+    "checkJs": true,
+    "moduleResolution": "NodeNext",
+    "sourceMap": true,
+    "declarationMap": true,
+    "allowSyntheticDefaultImports": true
+    //"esModuleInterop": true
+  }
+}
