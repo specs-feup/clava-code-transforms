@@ -1,8 +1,8 @@
 {
-  "name": "clava-project-template",
+  "name": "clava-code-transformations",
   "version": "1.0.0",
-  "author": "L. Sousa",
-  "description": "A template for developing projects for Clava in Typescript",
+  "author": "tiagolascasas",
+  "description": "A set of C/C++ code transformations for Clava",
   "type": "module",
   "scripts": {
     "run": "clava-js dist/main.js -- clang CxxSources/",
