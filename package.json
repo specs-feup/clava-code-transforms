@@ -5,15 +5,13 @@
   "description": "A set of C/C++ code transformations for Clava",
   "type": "module",
   "scripts": {
-    "run": "clava dist/main.js -- clang CxxSources/",
-    "loopchar": "clava dist/testLoopCharacterizer.js -- clang CxxSources/loopchar/",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "lint": "eslint .",
     "docs": "typedoc",
-    "test": "cross-env NODE_OPTIONS='$NODE_OPTIONS --experimental-vm-modules' jest --detectOpenHandles --forceExit src",
-    "test:cov": "npm run test -- --coverage",
-    "test:watch": "npm run test -- --watch"
+    "test:loopchar": "clava dist/TestLoopCharacterizer.js -- clang inputs/loopchar/",
+    "test:structdecomp": "clava dist/TestStructDecomposer.js -- clang inputs/structdecomp/",
+    "std": "clava -h"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
