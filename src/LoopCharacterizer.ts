@@ -1,5 +1,3 @@
-
-
 export class LoopCharacterizer {
     static characterize(loop: any): LoopCharacterization {
         if (!loop.instanceOf("loop")) {
