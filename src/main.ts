@@ -1,5 +1,5 @@
-import { FunctionJp, Loop } from "clava-js/api/Joinpoints.js";
-import Query from "lara-js/api/weaver/Query.js";
+import { FunctionJp, Loop } from "@specs-feup/clava/api/Joinpoints.js"
+import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { LoopCharacterizer } from "./LoopCharacterizer.js";
 
 for (const fun of Query.search(FunctionJp, { name: "loop_characterization" })) {

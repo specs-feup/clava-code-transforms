@@ -5,7 +5,7 @@
   "description": "A set of C/C++ code transformations for Clava",
   "type": "module",
   "scripts": {
-    "run": "clava-js dist/main.js -- clang CxxSources/",
+    "run": "clava dist/main.js -- clang CxxSources/",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "lint": "eslint .",
@@ -28,6 +28,7 @@
     "ts-jest": "^29.2.2",
     "typedoc": "^0.26.4",
     "typescript": "^5.5.3",
-    "@specs-feup/clava": "3.0.1"
+    "@specs-feup/clava": "3.0.1",
+    "@specs-feup/lara": "3.0.2"
   }
 }
