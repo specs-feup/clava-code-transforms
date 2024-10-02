@@ -1,9 +1,5 @@
-import Query from "lara-js/api/weaver/Query.js";
-import { registerSourceCode } from "lara-js/jest/jestHelpers.js";
-import { Loop } from "clava-js/api/Joinpoints.js";
-import { LoopCharacterizer } from "./LoopCharacterizer.js";
 
-const code = `
+
 void loop_characterization(int A[100], int B[200], int C[300])
 {
     int idx;
@@ -65,27 +61,12 @@ void loop_characterization(int A[100], int B[200], int C[300])
         A[idx2] = 0;
     }
 }
-`;
 
-describe("Characterize loops", () => {
-    registerSourceCode(code);
-
-    const loops: Loop[] = [];
-    for (const loop of Query.search(Loop)) {
-        loops.push(loop);
-    }
-    it("Has loops", () => {
-        expect(loops.length).toBeGreaterThan(0);
-    });
-
-    it("Loop 0", () => {
-        const lcz = LoopCharacterizer.characterize(loops[0]);
-        console.log(lcz);
-        expect(lcz).toHaveProperty("inc");
-    });
-    it("Loop 13", () => {
-        const lcz = LoopCharacterizer.characterize(loops[13]);
-        console.log(lcz);
-        expect(lcz).toHaveProperty("inc");
-    });
-});
+int main()
+{
+    int A[100];
+    int B[200];
+    int C[300];
+    loop_characterization(A, B, C);
+    return 0;
+}

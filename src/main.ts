@@ -1,12 +1,10 @@
+import { FunctionJp, Loop } from "clava-js/api/Joinpoints.js";
 import Query from "lara-js/api/weaver/Query.js";
-import IdGenerator from "lara-js/api/lara/util/IdGenerator.js"
-import { FunctionJp } from "clava-js/api/Joinpoints.js";
-import { foo } from "./foo.js";
+import { LoopCharacterizer } from "./LoopCharacterizer.js";
 
-for (const $function of Query.search(FunctionJp)) {
-    console.log($function.name);
+for (const fun of Query.search(FunctionJp, { name: "loop_characterization" })) {
+    for (const loop of Query.searchFrom(fun, Loop)) {
+        const lcz = LoopCharacterizer.characterize(loop);
+        console.log(lcz);
+    }
 }
-
-console.log(IdGenerator.next("hello"));
-console.log("Done");
-console.log("Also, foo =", foo());
