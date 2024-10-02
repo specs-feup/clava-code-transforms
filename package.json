@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "run": "clava dist/main.js -- clang CxxSources/",
+    "loopchar": "clava dist/testLoopCharacterizer.js -- clang CxxSources/loopchar/",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "lint": "eslint .",
