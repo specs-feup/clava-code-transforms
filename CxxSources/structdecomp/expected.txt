@@ -1,0 +1,8 @@
+Point3D: (1.00, 2.00, 3.00)
+Point3D + 1: (2, 3, 4)
+Point3D: (1.00, 2.00, 3.00)
+Point3D + 1: (2, 3, 4)
+Data: ID=101, Value=99.90, Name=Sample Data
+Data + 1: ID=102, Value=100.90
+Data: ID=101, Value=99.90, Name=Sample Data
+Data + 1: ID=102, Value=100.90
