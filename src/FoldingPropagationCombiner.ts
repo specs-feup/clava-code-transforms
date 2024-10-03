@@ -1,7 +1,8 @@
-laraImport("clava.code.ConstantPropagator");
-laraImport("clava.code.ConstantFolder");
+import ConstantFolder from "./ConstantFolder.js";
+import ConstantPropagator from "./ConstantPropagator.js";
 
-class FoldingPropagationCombiner {
+
+export default class FoldingPropagationCombiner {
     constructor() { }
 
     doPassesUntilStop(maxPasses = 99, minPasses = 2) {

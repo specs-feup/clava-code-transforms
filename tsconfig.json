@@ -4,12 +4,8 @@
     "node_modules",
     "**/*.spec.ts",
     "**/*.test.ts",
-    "src/ConstantFolder.ts",
-    "src/ConstantPropagator.ts",
-    "src/FoldingPropagationCombiner.ts",
     "src/Outliner.ts",
     "src/Voidifier.ts",
-    "test/TestConstantPropagator.ts",
     "test/TestOutliner.ts",
     "test/TestVoidifier.ts"
   ],

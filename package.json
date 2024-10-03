@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "docs": "typedoc",
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
+    "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
     "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11"
   },

@@ -1,12 +1,12 @@
-laraImport("weaver.Query");
-laraImport("clava.ClavaJoinPoints");
+import Query from "@specs-feup/lara/api/weaver/Query.js";
+import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
+import { BinaryOp, BoolLiteral, FloatLiteral, IntLiteral, Literal, Op } from "@specs-feup/clava/api/Joinpoints.js";
 
-
-class ConstantFolder {
+export default class ConstantFolder {
 
     constructor() { }
 
-    doPassesUntilStop(maxPasses = 99) {
+    doPassesUntilStop(maxPasses = 99): number {
         let passes = 1;
         let hasChanged = this.doPass();
 
@@ -17,12 +17,13 @@ class ConstantFolder {
         return passes;
     }
 
-    doPass() {
+    doPass(): boolean {
         let hasChanged = false;
 
-        for (const op of Query.search("binaryOp")) {
-            const isLiteral1 = op.left.instanceOf(["intLiteral", "floatLiteral"]);
-            const isLiteral2 = op.right.instanceOf(["intLiteral", "floatLiteral"]);
+        for (const op of Query.search(BinaryOp)) {
+
+            const isLiteral1 = op.left instanceof IntLiteral || op.left instanceof FloatLiteral;
+            const isLiteral2 = op.right instanceof IntLiteral || op.left instanceof FloatLiteral;
 
             if (isLiteral1 && isLiteral2) {
                 hasChanged = this.#fold(op);
@@ -32,10 +33,31 @@ class ConstantFolder {
         return hasChanged;
     }
 
-    #fold(op) {
-        const n1 = this.#convertToNumber(op.left);
-        const n2 = this.#convertToNumber(op.right);
-        const isFloat = op.left.instanceOf("floatLiteral") || op.right.instanceOf("floatLiteral");
+    #fold(op: BinaryOp): boolean {
+        const leftLit = op.left;
+        const rightLit = op.right;
+
+        let n1: number = NaN;
+        let n2: number = NaN;
+
+        if (leftLit instanceof IntLiteral || leftLit instanceof FloatLiteral) {
+            n1 = leftLit.value;
+        }
+        if (rightLit instanceof IntLiteral || rightLit instanceof FloatLiteral) {
+            n2 = rightLit.value;
+        }
+        if (leftLit instanceof BoolLiteral) {
+            n1 = leftLit.value ? 1 : 0;
+        }
+        if (rightLit instanceof BoolLiteral) {
+            n2 = rightLit.value ? 1 : 0;
+        }
+
+        if (isNaN(n1) || isNaN(n2)) {
+            return false;
+        }
+
+        const isFloat = leftLit instanceof FloatLiteral || rightLit instanceof FloatLiteral;
 
         const newLit = this.#doOperation(op.kind, n1, n2, isFloat);
 
@@ -48,27 +70,25 @@ class ConstantFolder {
         }
     }
 
-    #convertToNumber(literal) {
-        if (literal.instanceOf("intLiteral")) {
-            return parseInt(literal.value);
-        }
-        else if (literal.instanceOf("floatLiteral")) {
-            return parseFloat(literal.value);
-        }
-        else {
-            throw new Error("Unknown literal type");
-        }
-    }
+    #doOperation(kind: string, n1: number, n2: number, isFloat: boolean): Literal | null {
+        console.log(`[ConstantFolder] Folding constants ${n1} and ${n2} using ${kind} (${isFloat ? "float" : "int"} output)`);
 
-    #doOperation(kind, n1, n2, isFloat) {
-        let res = null;
+        let res: number = 0;
 
         switch (kind) {
             case "mul":
                 res = n1 * n2;
                 break;
             case "div":
-                res = n1 / n2;
+                if (n2 == 0) {
+                    return null;
+                }
+                if (isFloat) {
+                    res = n1 / n2;
+                }
+                else {
+                    res = Math.floor(n1 / n2);
+                }
                 break;
             case "rem":
                 res = n1 % n2;
@@ -89,28 +109,22 @@ class ConstantFolder {
                 // no idea
                 break;
             case "lt":
-                res = n1 < n2;
-                res = Number(res);
+                res = Number(n1 < n2);
                 break;
             case "gt":
-                res = n1 > n2;
-                res = Number(res);
+                res = Number(n1 > n2);
                 break;
             case "le":
-                res = n1 <= n2;
-                res = Number(res);
+                res = Number(n1 <= n2);
                 break;
             case "ge":
-                res = n1 >= n2;
-                res = Number(res);
+                res = Number(n1 >= n2);
                 break;
             case "eq":
-                res = n1 == n2;
-                res = Number(res);
+                res = Number(n1 == n2);
                 break;
             case "ne":
-                res = n1 != n2;
-                res = Number(res);
+                res = Number(n1 != n2);
                 break;
             case "and":
                 res = n1 & n2;
@@ -140,22 +154,16 @@ class ConstantFolder {
         }
     }
 
-    #buildLiteral(res, isFloat) {
-        if (isNaN(res)) {
+    #buildLiteral(n: number, isFloat: boolean): Literal | null {
+        if (Number.isNaN(n)) {
             return null;
         }
         if (isFloat) {
-            const n = parseFloat(res);
-            if (!isNaN(n)) {
-                return ClavaJoinPoints.doubleLiteral(n);
-            }
+            return ClavaJoinPoints.doubleLiteral(n);
         }
         else {
-            const n = parseInt(res);
-            if (!isNaN(n)) {
-                return ClavaJoinPoints.integerLiteral(n);
-            }
+            const flooredN = Math.floor(n);
+            return ClavaJoinPoints.integerLiteral(flooredN);
         }
-        return null;
     }
 }

@@ -1,5 +1,4 @@
-laraImport("clava.code.FoldingPropagationCombiner");
-laraImport("weaver.Query");
+import FoldingPropagationCombiner from "../src/FoldingPropagationCombiner.js";
 
 function main() {
     const constPropComb = new FoldingPropagationCombiner();
