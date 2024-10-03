@@ -9,9 +9,8 @@
     "build:watch": "tsc --watch",
     "lint": "eslint .",
     "docs": "typedoc",
-    "test:loopchar": "clava dist/TestLoopCharacterizer.js -- clang inputs/loopchar/",
-    "test:structdecomp": "clava dist/TestStructDecomposer.js -- clang inputs/structdecomp/",
-    "std": "clava -h"
+    "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
+    "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
