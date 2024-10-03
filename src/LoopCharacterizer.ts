@@ -1,4 +1,4 @@
-export class LoopCharacterizer {
+export default class LoopCharacterizer {
     static characterize(loop: any): LoopCharacterization {
         if (!loop.instanceOf("loop")) {
             console.log("[LoopCharacterizer] ERROR: argument is not a loop");

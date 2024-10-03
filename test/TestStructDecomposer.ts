@@ -1,4 +1,4 @@
-import { StructDecomposer } from "../src/StructDecomposer.js";
+import StructDecomposer from "../src/StructDecomposer.js";
 import { AstDumper } from "./AstDumper.js";
 
 function main() {
