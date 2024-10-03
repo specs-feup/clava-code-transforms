@@ -1,18 +1,19 @@
-laraImport("weaver.Query");
-laraImport("lara.util.IdGenerator");
+import { FunctionJp, Param, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 
-class ArrayFlattener {
+
+export default class ArrayFlattener {
     constructor() { }
 
-    flattenAllInFunction(fun) {
+    flattenAllInFunction(fun: FunctionJp) {
+        console.log("[ArrayFlattener] Flattening arrays in function " + fun.name);
 
     }
 
-    flattenParameterArray(fun, arrayParam) {
+    flattenParameterArray(fun: FunctionJp, arrayParam: Param) {
 
     }
 
-    flattenLocalArray(fun, arrayVar) {
+    flattenLocalArray(fun: FunctionJp, arrayVar: Varref) {
 
     }
 }

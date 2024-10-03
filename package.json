@@ -9,8 +9,13 @@
     "build:watch": "tsc --watch",
     "lint": "eslint .",
     "docs": "typedoc",
+    "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
     "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11"
+  },
+  "exports": {
+    "./LoopCharacterizer": "./dist/src/LoopCharacterizer.js",
+    "./StructDecomposer": "./dist/src/StructDecomposer.js"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
