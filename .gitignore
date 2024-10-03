@@ -114,3 +114,13 @@ dist
 .tern-port
 
 inputs/structdecomp/a.out
+
+consumer_order.txt
+
+enum_integer_type.txt
+
+is_temporary.txt
+
+omp.txt
+
+types_with_templates.txt
