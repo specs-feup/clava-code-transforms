@@ -1,10 +1,13 @@
-laraImport("clava.Clava");
-laraImport("lara.util.IdGenerator");
+import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints";
+import ClavaType from "@specs-feup/clava/api/clava/ClavaType";
+import { ArrayAccess, Call, Expression, FunctionJp, Param, ReturnStmt, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints";
+import Query from "@specs-feup/lara/api/weaver/Query";
+import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator";
 
-class Voidifier {
+export class Voidifier {
     constructor() { }
 
-    voidify(fun, returnVarName = "rtr_value") {
+    voidify(fun: FunctionJp, returnVarName = "rtr_value"): boolean {
         const returnStmts = this.#findNonvoidReturnStmts(fun);
         if (returnStmts.length == 0) {
             return false;
@@ -18,14 +21,14 @@ class Voidifier {
 
         this.#voidifyFunction(fun, returnStmts, returnVarName, retVarType);
 
-        for (const call of Query.search("call", { "signature": fun.signature })) {
+        for (const call of Query.search(Call, { "signature": fun.signature })) {
             this.#handleCall(call, fun, retVarType);
         }
         return true;
     }
 
-    #makeDefaultParamsExplicit(fun) {
-        const initParams = [];
+    #makeDefaultParamsExplicit(fun: FunctionJp): void {
+        const initParams: Param[] = [];
         let offset = -1;
 
         for (const param of fun.params) {
@@ -34,7 +37,6 @@ class Voidifier {
             }
 
             if (param.hasInit) {
-
                 initParams.push(param);
             }
         }
@@ -43,8 +45,8 @@ class Voidifier {
         }
 
         // Update calls with the actual values
-        for (const call of Query.search("call", { "signature": fun.signature })) {
-            const newArgs = [];
+        for (const call of Query.search(Call, { "signature": fun.signature })) {
+            const newArgs: Expression[] = [];
             let i = 0;
             let j = 0;
 
@@ -53,8 +55,10 @@ class Voidifier {
                     newArgs.push(arg);
                 }
                 else {
-                    if (arg.joinPointType == "expression" && arg.children.length == 0) {
-                        newArgs.push(initParams[j].children[0]);
+                    if (arg instanceof Expression && arg.children.length == 0) {
+                        const currParam = initParams[j];
+                        const initExpr: Expression = currParam.children[0] as Expression;
+                        newArgs.push(initExpr);
                     }
                     else {
                         newArgs.push(arg);
@@ -63,7 +67,7 @@ class Voidifier {
                 }
                 i++;
             }
-            const newCall = ClavaJoinPoints.call(fun, newArgs);
+            const newCall = ClavaJoinPoints.call(fun, ...newArgs);
             call.replaceWith(newCall);
         }
 
@@ -84,16 +88,16 @@ class Voidifier {
 
     #handleAssignmentCall(call, fun) {
         const parent = call.parent;
-        let newArg = null;
+        let newArg: UnaryOp;
 
-        if (parent.left.instanceOf("varref")) {
+        if (parent.left instanceof Varref) {
             const newRef = ClavaJoinPoints.varRef(parent.left.declaration);
             newArg = ClavaJoinPoints.unaryOp("&", newRef);
         }
-        else if (parent.left.instanceOf("arrayAccess")) {
+        else if (parent.left instanceof ArrayAccess) {
             newArg = ClavaJoinPoints.unaryOp("&", parent.left);
         }
-        else if (parent.left.instanceOf("unaryOp") && parent.left.kind == "deref") {
+        else if (parent.left instanceof UnaryOp && parent.left.kind == "deref") {
             newArg = parent.left.children[0];
         }
         else {
@@ -149,7 +153,7 @@ class Voidifier {
         newArg = Array.isArray(newArg) ? newArg : [newArg];
         const args = [...oldCall.argList, ...newArg];
 
-        const newCall = ClavaJoinPoints.call(fun, args);
+        const newCall = ClavaJoinPoints.call(fun, ...args);
         return newCall;
     }
 
@@ -195,7 +199,7 @@ class Voidifier {
         }
     }
 
-    #voidifyFunction(fun, returnStmts, returnVarName, retVarType) {
+    #voidifyFunction(fun, returnStmts, returnVarName, retVarType): void {
         const pointerType = ClavaJoinPoints.pointer(retVarType);
         const retParam = ClavaJoinPoints.param(returnVarName, pointerType);
         fun.addParam(retParam);
@@ -208,12 +212,12 @@ class Voidifier {
             ret.insertBefore(ClavaJoinPoints.exprStmt(op));
 
         }
-        fun.setType(ClavaType.asType("void"));
+        fun.setReturnType(ClavaType.asType("void"));
     }
 
-    #findNonvoidReturnStmts(fun) {
-        const returnStmts = [];
-        for (const ret of Query.searchFrom(fun, "returnStmt")) {
+    #findNonvoidReturnStmts(fun: FunctionJp): ReturnStmt[] {
+        const returnStmts: ReturnStmt[] = [];
+        for (const ret of Query.searchFrom(fun, ReturnStmt)) {
             if (ret.numChildren > 0) {
                 returnStmts.push(ret);
             }
