@@ -15,6 +15,10 @@
     "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11"
   },
   "exports": {
+    "./ArrayFlattener": "./dist/src/ArrayFlattener.js",
+    "./ConstantFolder": "./dist/src/ConstantFolder.js",
+    "./ConstantPropagator": "./dist/src/ConstantPropagator.js",
+    "./FoldingPropagationCombiner": "./dist/src/FoldingPropagationCombiner.js",
     "./LoopCharacterizer": "./dist/src/LoopCharacterizer.js",
     "./StructDecomposer": "./dist/src/StructDecomposer.js"
   },

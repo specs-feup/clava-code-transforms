@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { Decl, FloatLiteral, FunctionJp, IntLiteral, Param, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { FloatLiteral, FunctionJp, IntLiteral, Param, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 
 export default class ConstantPropagator {
     constructor() { }

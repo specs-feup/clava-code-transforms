@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, BoolLiteral, FloatLiteral, IntLiteral, Literal, Op } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, BoolLiteral, FloatLiteral, IntLiteral, Literal } from "@specs-feup/clava/api/Joinpoints.js";
 
 export default class ConstantFolder {
 
