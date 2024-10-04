@@ -12,7 +12,8 @@
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
     "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
-    "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11"
+    "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11",
+    "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/"
   },
   "exports": {
     "./ArrayFlattener": "./dist/src/ArrayFlattener.js",

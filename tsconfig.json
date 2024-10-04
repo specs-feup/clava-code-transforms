@@ -5,9 +5,7 @@
     "**/*.spec.ts",
     "**/*.test.ts",
     "src/Outliner.ts",
-    "src/Voidifier.ts",
-    "test/TestOutliner.ts",
-    "test/TestVoidifier.ts"
+    "test/TestOutliner.ts"
   ],
   "compilerOptions": {
     "outDir": "dist",

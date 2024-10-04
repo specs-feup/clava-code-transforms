@@ -1,8 +1,7 @@
-import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints";
-import ClavaType from "@specs-feup/clava/api/clava/ClavaType";
-import { ArrayAccess, Call, Expression, FunctionJp, Param, ReturnStmt, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints";
-import Query from "@specs-feup/lara/api/weaver/Query";
-import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator";
+import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
+import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Loop, Param, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import Query from "@specs-feup/lara/api/weaver/Query.js";
+import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 
 export class Voidifier {
     constructor() { }
@@ -77,7 +76,7 @@ export class Voidifier {
         }
     }
 
-    #functionIsOperator(fun) {
+    #functionIsOperator(fun: FunctionJp) {
         // Honestly I have no idea how to do this using the current AST
         // So we can use a regex, since they always follow the pattern of
         // "operator<symbol>"
@@ -86,19 +85,20 @@ export class Voidifier {
         return regex.test(fun.name);
     }
 
-    #handleAssignmentCall(call, fun) {
-        const parent = call.parent;
-        let newArg: UnaryOp;
+    #handleAssignmentCall(call: Call, fun: FunctionJp) {
+        const parent = call.parent as BinaryOp; // TS: should be safe, as it was checked before calling this method
+        let newArg: Expression;
 
         if (parent.left instanceof Varref) {
-            const newRef = ClavaJoinPoints.varRef(parent.left.declaration);
+            const parentVarref = parent.left as Varref;
+            const newRef = ClavaJoinPoints.varRef(parentVarref.vardecl);    // TS: possibly dangerous, needs to be checked
             newArg = ClavaJoinPoints.unaryOp("&", newRef);
         }
         else if (parent.left instanceof ArrayAccess) {
             newArg = ClavaJoinPoints.unaryOp("&", parent.left);
         }
         else if (parent.left instanceof UnaryOp && parent.left.kind == "deref") {
-            newArg = parent.left.children[0];
+            newArg = parent.left.children[0] as Expression; // TS: possibly dangerous, needs to be checked
         }
         else {
             throw new Error("[Voidifier] Unexpected lhs of call: " + parent.left.joinPointType + "\nOn source code line: " + parent.parent.code);
@@ -110,7 +110,7 @@ export class Voidifier {
         parent.replaceWith(newCall);
     }
 
-    #handleIsolatedCall(call, fun, retVarType) {
+    #handleIsolatedCall(call: Call, fun: FunctionJp, retVarType: Type) {
         const tempId = IdGenerator.next("__vdtemp");
         const tempVar = ClavaJoinPoints.varDeclNoInit(tempId, retVarType);
 
@@ -129,7 +129,7 @@ export class Voidifier {
         call.replaceWith(newCall);
     }
 
-    #handleGenericCall(call, fun, retVarType) {
+    #handleGenericCall(call: Call, fun: FunctionJp, retVarType: Type) {
         const masterStmt = this.#findParentStmt(call);
 
         // create new temp variable
@@ -149,15 +149,14 @@ export class Voidifier {
         call.replaceWith(ClavaJoinPoints.varRef(tempVar));
     }
 
-    #buildCall(fun, oldCall, newArg) {
-        newArg = Array.isArray(newArg) ? newArg : [newArg];
-        const args = [...oldCall.argList, ...newArg];
+    #buildCall(fun: FunctionJp, oldCall: Call, ...newArgs: Expression[]): Call {
+        const args = [...oldCall.argList, ...newArgs];
 
         const newCall = ClavaJoinPoints.call(fun, ...args);
         return newCall;
     }
 
-    #applyCasting(arg, fun) {
+    #applyCasting(arg: Expression, fun: FunctionJp): Expression {
         const lastParam = fun.params[fun.params.length - 1];
         const lastParamType = lastParam.type;
         const argType = arg.type;
@@ -171,26 +170,26 @@ export class Voidifier {
         }
     }
 
-    #findParentStmt(call) {
+    #findParentStmt(call: Call): any {
         let parent = call.parent;
-        while (!parent.instanceOf("statement")) {
+        while (!(parent instanceof Statement)) {
             parent = parent.parent;
         }
-        if (parent.parent.instanceOf(["loop", "if"])) { // maybe even switch
+        if (parent.parent instanceof Loop || parent.parent instanceof If) { // maybe even switch
             parent = parent.parent;
         }
         return parent;
     }
 
-    #handleCall(call, fun, retVarType) {
+    #handleCall(call: Call, fun: FunctionJp, retVarType: Type): void {
         const parent = call.parent;
 
         // call is in an assignment
-        if (parent.instanceOf("binaryOp") && parent.kind == "assign") {
+        if (parent instanceof BinaryOp && parent.kind == "assign") {
             this.#handleAssignmentCall(call, fun);
         }
         // call is isolated (i.e., the return value is ignored. We still need to pass a valid variable to save it, though)
-        else if (parent.instanceOf("exprStmt")) {
+        else if (parent instanceof ExprStmt) {
             this.#handleIsolatedCall(call, fun, retVarType);
         }
         // call is in the middle of some expression
@@ -199,20 +198,21 @@ export class Voidifier {
         }
     }
 
-    #voidifyFunction(fun, returnStmts, returnVarName, retVarType): void {
+    #voidifyFunction(fun: FunctionJp, returnStmts: ReturnStmt[], returnVarName: string, retVarType: Type): void {
         const pointerType = ClavaJoinPoints.pointer(retVarType);
         const retParam = ClavaJoinPoints.param(returnVarName, pointerType);
         fun.addParam(retParam);
 
         for (const ret of returnStmts) {
             const derefRet = ClavaJoinPoints.unaryOp("*", retParam.varref());
-            const retVal = ret.children[0];
+            const retVal = ret.children[0] as Expression;   // TS: possibly dangerous, needs to be checked
             retVal.detach();
             const op = ClavaJoinPoints.binaryOp("=", derefRet, retVal, retVarType);
             ret.insertBefore(ClavaJoinPoints.exprStmt(op));
 
         }
-        fun.setReturnType(ClavaType.asType("void"));
+        const voidType = ClavaJoinPoints.type("void");
+        fun.setReturnType(voidType);
     }
 
     #findNonvoidReturnStmts(fun: FunctionJp): ReturnStmt[] {
