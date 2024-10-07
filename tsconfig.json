@@ -1,12 +1,6 @@
 {
   "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": [
-    "node_modules",
-    "**/*.spec.ts",
-    "**/*.test.ts",
-    "src/Outliner.ts",
-    "test/TestOutliner.ts"
-  ],
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"],
   "compilerOptions": {
     "outDir": "dist",
     "target": "ES2022",
