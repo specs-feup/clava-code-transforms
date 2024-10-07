@@ -12,6 +12,7 @@
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
     "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
+    "test:outliner": "clava dist/test/TestOutliner.js -- clang inputs/outlining/",
     "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11",
     "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/"
   },
@@ -21,7 +22,9 @@
     "./ConstantPropagator": "./dist/src/ConstantPropagator.js",
     "./FoldingPropagationCombiner": "./dist/src/FoldingPropagationCombiner.js",
     "./LoopCharacterizer": "./dist/src/LoopCharacterizer.js",
-    "./StructDecomposer": "./dist/src/StructDecomposer.js"
+    "./Outliner": "./dist/src/Outliner.js",
+    "./StructDecomposer": "./dist/src/StructDecomposer.js",
+    "./Voidifier": "./dist/src/Voidifier.js"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

@@ -5,8 +5,8 @@ import { AstDumper } from "./AstDumper.js";
 
 function main() {
     const dumper = new AstDumper();
-    const astDump = dumper.dump();
-    console.log(astDump);
+    //const astDump = dumper.dump();
+    //console.log(astDump);
 
     // We want the wrapper statement around the pragma, not the pragma itself
     // as the wrapper statements both share the same parent (i.e., are on the same scope)

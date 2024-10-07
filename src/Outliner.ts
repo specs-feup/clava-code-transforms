@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { BuiltinType, Call, Decl, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelDecl, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, TypedefType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { BuiltinType, Call, Decl, DeclStmt, ElaboratedType, Expression, FunctionJp, FunctionType, GotoStmt, Joinpoint, LabelDecl, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, Type, TypedefType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import JoinPoints from "@specs-feup/lara/api/weaver/JoinPoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
@@ -69,7 +69,8 @@ export default class Outliner {
         this.#printMsg("Wrapped outline region with begin and ending comments");
 
         //------------------------------------------------------------------------------
-        const parentFun: FunctionJp | null = this.#findParentFunction(begin);
+        //const parentFun: FunctionJp | null = this.#findParentFunction(begin);
+        const parentFun = begin.getAncestor("function") as FunctionJp | null;
         if (parentFun == null) {
             this.#printMsg("Could not find parent function for the outline region");
             return [null, null];
@@ -176,7 +177,8 @@ export default class Outliner {
      */
     checkOutline(begin: Statement, end: Statement): boolean {
         var outlinable = true;
-        const parentFun = this.#findParentFunction(begin);
+        //const parentFun = this.#findParentFunction(begin);
+        const parentFun = begin.getAncestor("function") as FunctionJp | null;
 
         if (parentFun == null) {
             this.#printMsg("Requirement not met: outlinable region must be inside a function");
@@ -285,6 +287,9 @@ export default class Outliner {
         return [beginWrapper, endWrapper];
     }
 
+    /**
+     * @deprecated - use .getAncestor(FunctionJp) instead
+     */
     #findParentFunction(jp: Joinpoint): FunctionJp | null {
         while (!(jp instanceof FunctionJp)) {
             if (jp instanceof File) {
@@ -349,17 +354,11 @@ export default class Outliner {
     }
 
     #createFunction(name: string, region: Statement[], params: Param[]): FunctionJp {
-        // let oldFun = region[0];
-        // while (!(oldFun instanceof FunctionJp)) {
-        //     oldFun = oldFun.parent;
-        // }
-        let oldFun = null;
-        for (const stmt of region) {
-            if (stmt instanceof FunctionJp) {
-                oldFun = stmt;
-                break;
-            }
+        let oldFun: Joinpoint = region[0];
+        while (!(oldFun instanceof FunctionJp)) {
+            oldFun = oldFun.parent;
         }
+
         if (oldFun == null) {
             throw new Error("Could not find parent function for the outline region");
         }
