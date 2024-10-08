@@ -2,7 +2,7 @@
   "name": "clava-code-transformations",
   "version": "1.0.0",
   "author": "tiagolascasas",
-  "description": "A set of C/C++ code transformations for Clava",
+  "description": "A set of advanced C/C++ code transformations for Clava",
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -26,6 +26,10 @@
     "./StructDecomposer": "./dist/src/StructDecomposer.js",
     "./Voidifier": "./dist/src/Voidifier.js"
   },
+  "dependencies": {
+    "@specs-feup/clava": "3.0.1",
+    "@specs-feup/lara": "3.0.2"
+  },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.12",
@@ -39,8 +43,6 @@
     "jest": "^29.7.0",
     "ts-jest": "^29.2.2",
     "typedoc": "^0.26.4",
-    "typescript": "^5.5.3",
-    "@specs-feup/clava": "3.0.1",
-    "@specs-feup/lara": "3.0.2"
+    "typescript": "^5.5.3"
   }
 }
