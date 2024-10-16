@@ -14,7 +14,8 @@
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
     "test:outliner": "clava dist/test/TestOutliner.js -- clang inputs/outlining/",
     "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11",
-    "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/"
+    "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/",
+    "clean": "rm -rf node_modules package-lock.json dist/ woven_code/ output/"
   },
   "exports": {
     "./ArrayFlattener": "./dist/src/ArrayFlattener.js",
@@ -24,6 +25,7 @@
     "./LoopCharacterizer": "./dist/src/LoopCharacterizer.js",
     "./Outliner": "./dist/src/Outliner.js",
     "./StructDecomposer": "./dist/src/StructDecomposer.js",
+    "./SwitchToIf": "./dist/src/SwitchToIf.js",
     "./Voidifier": "./dist/src/Voidifier.js"
   },
   "dependencies": {

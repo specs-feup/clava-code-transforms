@@ -1,7 +1,0 @@
-{
-  "files.associations": {
-    "*.tcc": "cpp",
-    "streambuf": "cpp",
-    "atomic": "cpp"
-  }
-}

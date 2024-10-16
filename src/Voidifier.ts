@@ -1,9 +1,9 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Loop, Param, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
-import Query from "@specs-feup/lara/api/weaver/Query.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
+import Query from "@specs-feup/lara/api/weaver/Query.js";
 
-export class Voidifier {
+export default class Voidifier {
     constructor() { }
 
     voidify(fun: FunctionJp, returnVarName = "rtr_value"): boolean {
@@ -43,7 +43,8 @@ export class Voidifier {
             return;
         }
 
-        // Update calls with the actual values
+        //Update calls with the actual values
+
         for (const call of Query.search(Call, { "signature": fun.signature })) {
             const newArgs: Expression[] = [];
             let i = 0;
@@ -76,7 +77,7 @@ export class Voidifier {
         }
     }
 
-    #functionIsOperator(fun: FunctionJp) {
+    #functionIsOperator(fun: FunctionJp): boolean {
         // Honestly I have no idea how to do this using the current AST
         // So we can use a regex, since they always follow the pattern of
         // "operator<symbol>"
@@ -85,7 +86,7 @@ export class Voidifier {
         return regex.test(fun.name);
     }
 
-    #handleAssignmentCall(call: Call, fun: FunctionJp) {
+    #handleAssignmentCall(call: Call, fun: FunctionJp): void {
         const parent = call.parent as BinaryOp; // TS: should be safe, as it was checked before calling this method
         let newArg: Expression;
 
@@ -110,12 +111,12 @@ export class Voidifier {
         parent.replaceWith(newCall);
     }
 
-    #handleIsolatedCall(call: Call, fun: FunctionJp, retVarType: Type) {
+    #handleIsolatedCall(call: Call, fun: FunctionJp, retVarType: Type): void {
         const tempId = IdGenerator.next("__vdtemp");
         const tempVar = ClavaJoinPoints.varDeclNoInit(tempId, retVarType);
 
         // for things like "while(foo(&__dummy))"
-        if (call.parent.parent.instanceOf("loop")) {
+        if (call.parent.parent instanceof Loop) {
             call.parent.parent.insertBefore(tempVar);
         }
         else {
@@ -129,7 +130,7 @@ export class Voidifier {
         call.replaceWith(newCall);
     }
 
-    #handleGenericCall(call: Call, fun: FunctionJp, retVarType: Type) {
+    #handleGenericCall(call: Call, fun: FunctionJp, retVarType: Type): void {
         const masterStmt = this.#findParentStmt(call);
 
         // create new temp variable
@@ -170,7 +171,7 @@ export class Voidifier {
         }
     }
 
-    #findParentStmt(call: Call): any {
+    #findParentStmt(call: Call): Statement {
         let parent = call.parent;
         while (!(parent instanceof Statement)) {
             parent = parent.parent;
@@ -178,7 +179,7 @@ export class Voidifier {
         if (parent.parent instanceof Loop || parent.parent instanceof If) { // maybe even switch
             parent = parent.parent;
         }
-        return parent;
+        return parent as Statement;
     }
 
     #handleCall(call: Call, fun: FunctionJp, retVarType: Type): void {
@@ -201,7 +202,8 @@ export class Voidifier {
     #voidifyFunction(fun: FunctionJp, returnStmts: ReturnStmt[], returnVarName: string, retVarType: Type): void {
         const pointerType = ClavaJoinPoints.pointer(retVarType);
         const retParam = ClavaJoinPoints.param(returnVarName, pointerType);
-        fun.addParam(retParam);
+        fun.addParam(retParam.name, retParam.type);
+
 
         for (const ret of returnStmts) {
             const derefRet = ClavaJoinPoints.unaryOp("*", retParam.varref());

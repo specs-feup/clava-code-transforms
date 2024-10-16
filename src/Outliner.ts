@@ -242,8 +242,8 @@ export default class Outliner {
 
         // actions in the function itself
         const params = this.#createParams([resVarRef, boolVarRef]);
-        fun.addParam(params[0]);
-        fun.addParam(params[1]);
+        fun.addParam(params[0].name, params[0].type);
+        fun.addParam(params[1].name, params[1].type);
 
         for (const ret of returnStmts) {
             const resVarParam = fun.params[fun.params.length - 2];
