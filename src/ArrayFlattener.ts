@@ -6,7 +6,7 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 export default class ArrayFlattener {
     constructor() { }
 
-    flattenAllInFunction(fun: FunctionJp): number {
+    public flattenAllInFunction(fun: FunctionJp): number {
         for (const param of Query.searchFrom(fun, Param)) {
             this.flattenParameterArray(fun, param);
         }
@@ -17,11 +17,11 @@ export default class ArrayFlattener {
         return 0;
     }
 
-    flattenParameterArray(fun: FunctionJp, arrayParam: Param): void {
+    public flattenParameterArray(fun: FunctionJp, arrayParam: Param): void {
 
     }
 
-    flattenLocalArray(fun: FunctionJp, arrayVar: Varref): void {
+    public flattenLocalArray(fun: FunctionJp, arrayVar: Varref): void {
 
     }
 }

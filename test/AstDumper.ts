@@ -1,4 +1,4 @@
-import { BinaryOp, Call, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, FileJp, FunctionJp, IntLiteral, Joinpoint, MemberAccess, Param, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
 export class AstDumper {
@@ -43,7 +43,7 @@ export class AstDumper {
         if (jp.children.length > 4) {
             var allLits = true;
             for (const child of jp.children) {
-                if (!child.instanceOf("intLiteral")) {
+                if (!(child instanceof IntLiteral)) {
                     allLits = false;
                 }
             }

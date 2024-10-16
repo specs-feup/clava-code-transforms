@@ -6,27 +6,27 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 export default class Voidifier {
     constructor() { }
 
-    voidify(fun: FunctionJp, returnVarName = "rtr_value"): boolean {
-        const returnStmts = this.#findNonvoidReturnStmts(fun);
+    public voidify(fun: FunctionJp, returnVarName = "rtr_value"): boolean {
+        const returnStmts = this.findNonvoidReturnStmts(fun);
         if (returnStmts.length == 0) {
             return false;
         }
-        if (this.#functionIsOperator(fun)) {
+        if (this.functionIsOperator(fun)) {
             return false;
         }
-        this.#makeDefaultParamsExplicit(fun);
+        this.makeDefaultParamsExplicit(fun);
 
         const retVarType = fun.returnType;
 
-        this.#voidifyFunction(fun, returnStmts, returnVarName, retVarType);
+        this.voidifyFunction(fun, returnStmts, returnVarName, retVarType);
 
         for (const call of Query.search(Call, { "signature": fun.signature })) {
-            this.#handleCall(call, fun, retVarType);
+            this.handleCall(call, fun, retVarType);
         }
         return true;
     }
 
-    #makeDefaultParamsExplicit(fun: FunctionJp): void {
+    private makeDefaultParamsExplicit(fun: FunctionJp): void {
         const initParams: Param[] = [];
         let offset = -1;
 
@@ -77,7 +77,7 @@ export default class Voidifier {
         }
     }
 
-    #functionIsOperator(fun: FunctionJp): boolean {
+    private functionIsOperator(fun: FunctionJp): boolean {
         // Honestly I have no idea how to do this using the current AST
         // So we can use a regex, since they always follow the pattern of
         // "operator<symbol>"
@@ -86,7 +86,7 @@ export default class Voidifier {
         return regex.test(fun.name);
     }
 
-    #handleAssignmentCall(call: Call, fun: FunctionJp): void {
+    private handleAssignmentCall(call: Call, fun: FunctionJp): void {
         const parent = call.parent as BinaryOp; // TS: should be safe, as it was checked before calling this method
         let newArg: Expression;
 
@@ -105,13 +105,13 @@ export default class Voidifier {
             throw new Error("[Voidifier] Unexpected lhs of call: " + parent.left.joinPointType + "\nOn source code line: " + parent.parent.code);
         }
         // the pointer may need to be casted if there are signed/unsigned mismatches
-        const newCastedArg = this.#applyCasting(newArg, fun);
+        const newCastedArg = this.applyCasting(newArg, fun);
 
-        const newCall = this.#buildCall(fun, call, newCastedArg);
+        const newCall = this.buildCall(fun, call, newCastedArg);
         parent.replaceWith(newCall);
     }
 
-    #handleIsolatedCall(call: Call, fun: FunctionJp, retVarType: Type): void {
+    private handleIsolatedCall(call: Call, fun: FunctionJp, retVarType: Type): void {
         const tempId = IdGenerator.next("__vdtemp");
         const tempVar = ClavaJoinPoints.varDeclNoInit(tempId, retVarType);
 
@@ -126,12 +126,12 @@ export default class Voidifier {
         const newRef = ClavaJoinPoints.varRef(tempVar);
         const newArg = ClavaJoinPoints.unaryOp("&", newRef);
 
-        const newCall = this.#buildCall(fun, call, newArg);
+        const newCall = this.buildCall(fun, call, newArg);
         call.replaceWith(newCall);
     }
 
-    #handleGenericCall(call: Call, fun: FunctionJp, retVarType: Type): void {
-        const masterStmt = this.#findParentStmt(call);
+    private handleGenericCall(call: Call, fun: FunctionJp, retVarType: Type): void {
+        const masterStmt = this.findParentStmt(call);
 
         // create new temp variable
         const tempId = IdGenerator.next("__temp");
@@ -143,21 +143,21 @@ export default class Voidifier {
         const newArg = ClavaJoinPoints.unaryOp("&", newRef);
 
         // create new function call, and add it before the original stmt
-        const newCall = this.#buildCall(fun, call, newArg);
+        const newCall = this.buildCall(fun, call, newArg);
         masterStmt.insertBefore(newCall);
 
         // change call in original stmt to use temp variable
         call.replaceWith(ClavaJoinPoints.varRef(tempVar));
     }
 
-    #buildCall(fun: FunctionJp, oldCall: Call, ...newArgs: Expression[]): Call {
+    private buildCall(fun: FunctionJp, oldCall: Call, ...newArgs: Expression[]): Call {
         const args = [...oldCall.argList, ...newArgs];
 
         const newCall = ClavaJoinPoints.call(fun, ...args);
         return newCall;
     }
 
-    #applyCasting(arg: Expression, fun: FunctionJp): Expression {
+    private applyCasting(arg: Expression, fun: FunctionJp): Expression {
         const lastParam = fun.params[fun.params.length - 1];
         const lastParamType = lastParam.type;
         const argType = arg.type;
@@ -171,7 +171,7 @@ export default class Voidifier {
         }
     }
 
-    #findParentStmt(call: Call): Statement {
+    private findParentStmt(call: Call): Statement {
         let parent = call.parent;
         while (!(parent instanceof Statement)) {
             parent = parent.parent;
@@ -182,24 +182,24 @@ export default class Voidifier {
         return parent as Statement;
     }
 
-    #handleCall(call: Call, fun: FunctionJp, retVarType: Type): void {
+    private handleCall(call: Call, fun: FunctionJp, retVarType: Type): void {
         const parent = call.parent;
 
         // call is in an assignment
         if (parent instanceof BinaryOp && parent.kind == "assign") {
-            this.#handleAssignmentCall(call, fun);
+            this.handleAssignmentCall(call, fun);
         }
         // call is isolated (i.e., the return value is ignored. We still need to pass a valid variable to save it, though)
         else if (parent instanceof ExprStmt) {
-            this.#handleIsolatedCall(call, fun, retVarType);
+            this.handleIsolatedCall(call, fun, retVarType);
         }
         // call is in the middle of some expression
         else {
-            this.#handleGenericCall(call, fun, retVarType);
+            this.handleGenericCall(call, fun, retVarType);
         }
     }
 
-    #voidifyFunction(fun: FunctionJp, returnStmts: ReturnStmt[], returnVarName: string, retVarType: Type): void {
+    private voidifyFunction(fun: FunctionJp, returnStmts: ReturnStmt[], returnVarName: string, retVarType: Type): void {
         const pointerType = ClavaJoinPoints.pointer(retVarType);
         const retParam = ClavaJoinPoints.param(returnVarName, pointerType);
         fun.addParam(retParam.name, retParam.type);
@@ -217,7 +217,7 @@ export default class Voidifier {
         fun.setReturnType(voidType);
     }
 
-    #findNonvoidReturnStmts(fun: FunctionJp): ReturnStmt[] {
+    private findNonvoidReturnStmts(fun: FunctionJp): ReturnStmt[] {
         const returnStmts: ReturnStmt[] = [];
         for (const ret of Query.searchFrom(fun, ReturnStmt)) {
             if (ret.numChildren > 0) {

@@ -5,7 +5,7 @@ import { FloatLiteral, FunctionJp, IntLiteral, Param, Vardecl, Varref } from "@s
 export default class ConstantPropagator {
     constructor() { }
 
-    doPassesUntilStop(maxPasses = 99): number {
+    public doPassesUntilStop(maxPasses = 99): number {
         let passes = 1;
         let hasChanged = this.doPass();
 
@@ -22,19 +22,19 @@ export default class ConstantPropagator {
 
             if (varref.hasOwnProperty("vardecl") && varref.vardecl != null) {
                 if (varref.vardecl.isGlobal && varref.vardecl.hasInit) {
-                    this.#propagateConstantGlobal(varref);
+                    this.propagateConstantGlobal(varref);
                 }
             }
         }
         // for cases where a varref refers to a parameter or vardecl in a function
         for (const fun of Query.search(FunctionJp)) {
-            this.#propagateInFunction(fun);
+            this.propagateInFunction(fun);
         }
 
         return false;
     }
 
-    #propagateConstantGlobal(varref: Varref) {
+    private propagateConstantGlobal(varref: Varref) {
         const decl = varref.vardecl;
         const type = decl.type.code;
         const isConst = type.split(" ").includes("const");
@@ -54,7 +54,7 @@ export default class ConstantPropagator {
         }
     }
 
-    #propagateInFunction(fun: FunctionJp) {
+    private propagateInFunction(fun: FunctionJp) {
         const allDecls: Vardecl[] = [];
         const allParams: Param[] = [];
 
@@ -66,16 +66,16 @@ export default class ConstantPropagator {
         }
 
         for (const def of allDecls) {
-            const refChain = this.#findRefChain(def, fun);
-            this.#propagateChain(refChain);
+            const refChain = this.findRefChain(def, fun);
+            this.propagateChain(refChain);
         }
         for (const param of allParams) {
-            const refChain = this.#findRefChain(param, fun);
-            this.#propagateChain(refChain);
+            const refChain = this.findRefChain(param, fun);
+            this.propagateChain(refChain);
         }
     }
 
-    #findRefChain(def: Vardecl | Param, fun: FunctionJp): Varref[] {
+    private findRefChain(def: Vardecl | Param, fun: FunctionJp): Varref[] {
         const name = def.name;
         const refChain: Varref[] = [];
 
@@ -85,7 +85,7 @@ export default class ConstantPropagator {
         return refChain;
     }
 
-    #propagateChain(refChain: Varref[]) {
+    private propagateChain(refChain: Varref[]) {
         //println(refChain.length);
     }
 }

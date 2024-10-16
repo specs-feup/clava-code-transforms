@@ -5,7 +5,7 @@ import ConstantPropagator from "./ConstantPropagator.js";
 export default class FoldingPropagationCombiner {
     constructor() { }
 
-    doPassesUntilStop(maxPasses = 99, minPasses = 2) {
+    public doPassesUntilStop(maxPasses = 99, minPasses = 2) {
         const constFolder = new ConstantFolder();
         const constPropagator = new ConstantPropagator();
 

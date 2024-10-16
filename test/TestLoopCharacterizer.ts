@@ -4,7 +4,8 @@ import LoopCharacterizer from "../src/LoopCharacterizer.js";
 
 for (const fun of Query.search(FunctionJp, { name: "loop_characterization" })) {
     for (const loop of Query.searchFrom(fun, Loop)) {
-        const lcz = LoopCharacterizer.characterize(loop);
-        console.log(lcz);
+        const lcz = new LoopCharacterizer();
+        const res = lcz.characterize(loop);
+        console.log(res);
     }
 }
