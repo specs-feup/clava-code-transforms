@@ -1,3 +1,0 @@
-[submodule "inputs/clava-benchmarks"]
-	path = inputs/clava-benchmarks
-	url = https://github.com/specs-feup/clava-benchmarks
