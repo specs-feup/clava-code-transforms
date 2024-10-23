@@ -13,6 +13,7 @@
     "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
     "test:outliner": "clava dist/test/TestOutliner.js -- clang inputs/outlining/",
+    "test:outliner-edgecase": "clava dist/test/TestOutliner.js -- clang inputs/outlining/OutlineEdgecase.c",
     "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11",
     "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/",
     "clean": "rm -rf node_modules package-lock.json dist/ woven_code/ output/"
@@ -29,8 +30,7 @@
     "./Voidifier": "./dist/src/Voidifier.js"
   },
   "dependencies": {
-    "@specs-feup/clava": "3.0.1",
-    "@specs-feup/lara": "3.0.2"
+    "@specs-feup/clava": "^3.0.1"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

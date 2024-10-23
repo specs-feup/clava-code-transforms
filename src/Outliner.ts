@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { AdjustedType, ArrayType, BuiltinType, Call, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, TypedefType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdjustedType, ArrayType, BuiltinType, Call, Decl, DeclStmt, ElaboratedType, Expression, FunctionJp, FunctionType, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, TypedefType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
@@ -37,8 +37,8 @@ export default class Outliner {
      * @returns an array with the joinpoints of the outlined function and the call to it. 
      * These values are merely references, and all changes have already been committed to the AST at this point
      */
-    public outline(begin: Statement, end: Statement): [FunctionJp, Call] | [null, null] {
-        return this.outlineWithName(begin, end, this.generateFunctionName())
+    public outline(begin: Statement, end: Statement, outlineAllDecls: boolean = false): [FunctionJp, Call] | [null, null] {
+        return this.outlineWithName(begin, end, this.generateFunctionName(), outlineAllDecls)
     }
 
     /**
@@ -51,7 +51,7 @@ export default class Outliner {
      * @returns an array with the joinpoints of the outlined function and the call to it. 
      * These values are merely references, and all changes have already been committed to the AST at this point
      */
-    public outlineWithName(begin: Statement, end: Statement, functionName: string): [FunctionJp, Call] | [null, null] {
+    public outlineWithName(begin: Statement, end: Statement, functionName: string, outlineAllDecls: boolean = false): [FunctionJp, Call] | [null, null] {
         this.printMsg("Attempting to outline a region into a function named \"" + functionName + "\"");
 
         //------------------------------------------------------------------------------
@@ -92,15 +92,17 @@ export default class Outliner {
         this.printMsg("Created a placeholder call to the new function");
 
         //------------------------------------------------------------------------------
-        const declareBefore = this.findDeclsWithDependency(region, epilogue);
-        region = region.filter((stmt) => !declareBefore.includes(stmt as DeclStmt));
-        for (var i = declareBefore.length - 1; i >= 0; i--) {
-            const decl = declareBefore[i];
-            decl.detach();
-            begin.insertBefore(decl);
-            prologue.push(decl);
+        if (!outlineAllDecls) {
+            const declareBefore = this.findDeclsWithDependency(region, epilogue);
+            region = region.filter((stmt) => !declareBefore.includes(stmt as DeclStmt));
+            for (var i = declareBefore.length - 1; i >= 0; i--) {
+                const decl = declareBefore[i];
+                decl.detach();
+                begin.insertBefore(decl);
+                prologue.push(decl);
+            }
+            this.printMsg("Moved declarations from outline region to immediately before the region");
         }
-        this.printMsg("Moved declarations from outline region to immediately before the region");
 
         //------------------------------------------------------------------------------
         const referencedInRegion = this.findRefsInRegion(region);
@@ -369,6 +371,9 @@ export default class Outliner {
             this.printMsg("Found " + returnStmts.length + " return statement(s) in the outline region");
         }
 
+        if (params.length == 0) {
+            params.push(ClavaJoinPoints.param("dummy", ClavaJoinPoints.type("int")));
+        }
         const fun = ClavaJoinPoints.functionDecl(name, retType, ...params);
         oldFun.insertBefore(fun);
         const scope = ClavaJoinPoints.scope();

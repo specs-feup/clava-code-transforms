@@ -9,17 +9,17 @@ export default class FoldingPropagationCombiner {
         const constFolder = new ConstantFolder();
         const constPropagator = new ConstantPropagator();
 
-        let passes = 0;
-        let foldingChanges = true;
-        let propChanges = true;
+        let passes: number = 1;
         let keepGoing = true;
 
         do {
-            foldingChanges = constFolder.doPass();
-            propChanges = constPropagator.doPass();
+            const foldingChanges = constFolder.doPass();
+            const propChanges = constPropagator.doPass();
+
+            console.log(`[FoldingPropagationCombiner] Folded ${foldingChanges} expressions and replaced ${propChanges} vars by constants in pass ${passes}`);
 
             passes++;
-            const cond1 = foldingChanges || propChanges;
+            const cond1 = foldingChanges > 0 || propChanges > 0;
             const cond2 = passes < maxPasses;
             const cond3 = passes < minPasses;
             keepGoing = (cond1 && cond2) || cond3;

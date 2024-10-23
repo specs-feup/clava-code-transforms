@@ -1,91 +1,66 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { FloatLiteral, FunctionJp, IntLiteral, Param, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { BinaryOp, FloatLiteral, FunctionJp, IntLiteral, Joinpoint, Literal, Param, Program, Statement, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { LaraJoinPoint } from "@specs-feup/lara/api/LaraJoinPoint.js";
+import JoinPoints from "@specs-feup/lara/api/weaver/JoinPoints.js";
 
 export default class ConstantPropagator {
     constructor() { }
 
-    public doPassesUntilStop(maxPasses = 99): number {
-        let passes = 1;
-        let hasChanged = this.doPass();
+    public doPass(): number {
+        let replacements = 0;
 
-        while (hasChanged && passes < maxPasses) {
-            hasChanged = this.doPass();
-            passes++;
-        }
-        return passes;
-    }
+        for (const decl of Query.search(Vardecl)) {
+            if (!decl.hasInit) {
+                continue;
+            }
 
-    doPass(): boolean {
-        // for cases where a varref refers to a global like "const int foo = 10;"
-        for (const varref of Query.search(Varref)) {
-
-            if (varref.hasOwnProperty("vardecl") && varref.vardecl != null) {
-                if (varref.vardecl.isGlobal && varref.vardecl.hasInit) {
-                    this.propagateConstantGlobal(varref);
+            const init = decl.init;
+            if (init instanceof Literal) {
+                if (decl.isGlobal) {
+                    console.log("Global constant propagation not implemented yet.");
+                }
+                else {
+                    replacements += this.propagateConstantInFunction(decl, init);
                 }
             }
         }
-        // for cases where a varref refers to a parameter or vardecl in a function
-        for (const fun of Query.search(FunctionJp)) {
-            this.propagateInFunction(fun);
-        }
-
-        return false;
+        return replacements;
     }
 
-    private propagateConstantGlobal(varref: Varref) {
-        const decl = varref.vardecl;
-        const type = decl.type.code;
-        const isConst = type.split(" ").includes("const");
+    private propagateConstantInFunction(decl: Vardecl, init: Literal): number {
+        let replacements = 0;
+        const stmt = decl.getAncestor("statement");
+        const scope = stmt.getAncestor("scope");
+        let valid = false;
 
-        if (isConst) {
-            const init = varref.vardecl.init;
-            if (init instanceof IntLiteral) {
-                const value = init.value;
-                const newLiteral = ClavaJoinPoints.integerLiteral(value);
-                varref.replaceWith(newLiteral);
+        for (const stmt of scope.children) {
+            if (!(stmt instanceof Statement)) {
+                continue;
             }
-            if (init instanceof FloatLiteral) {
-                const value = init.value;
-                const newLiteral = ClavaJoinPoints.doubleLiteral(value);
-                varref.replaceWith(newLiteral);
+            if (stmt.astId === decl.astId) {
+                valid = true;
+                continue;
+            }
+            if (valid) {
+                for (const ref of Query.searchFrom(stmt, Varref, { "name": decl.name })) {
+                    if (this.isUseNotDef(ref)) {
+                        ref.replaceWith(init.copy());
+                        replacements++;
+                    }
+                }
             }
         }
+        return replacements;
     }
 
-    private propagateInFunction(fun: FunctionJp) {
-        const allDecls: Vardecl[] = [];
-        const allParams: Param[] = [];
+    private isUseNotDef(ref: Varref): boolean {
+        if (ref.parent instanceof BinaryOp) {
+            const op = ref.parent as BinaryOp;
 
-        for (const decl of Query.searchFrom(fun, Vardecl)) {
-            allDecls.push(decl);
-        }
-        for (const param of Query.searchFrom(fun, Param)) {
-            allParams.push(param);
-        }
+            if (op.kind == "assign") {
 
-        for (const def of allDecls) {
-            const refChain = this.findRefChain(def, fun);
-            this.propagateChain(refChain);
+            }
         }
-        for (const param of allParams) {
-            const refChain = this.findRefChain(param, fun);
-            this.propagateChain(refChain);
-        }
-    }
-
-    private findRefChain(def: Vardecl | Param, fun: FunctionJp): Varref[] {
-        const name = def.name;
-        const refChain: Varref[] = [];
-
-        for (const ref of Query.searchFrom(fun, Varref, { name: name })) {
-            refChain.push(ref);
-        }
-        return refChain;
-    }
-
-    private propagateChain(refChain: Varref[]) {
-        //println(refChain.length);
+        return true;
     }
 }

@@ -10,9 +10,7 @@ export default class ArrayFlattener {
         for (const param of Query.searchFrom(fun, Param)) {
             this.flattenParameterArray(fun, param);
         }
-        if (Query) {
-            console.log("Query is defined");
-        }
+
         const id = IdGenerator.next("foo");
         return 0;
     }

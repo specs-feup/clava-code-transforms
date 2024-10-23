@@ -5,8 +5,8 @@ import { AstDumper } from "./AstDumper.js";
 
 function main() {
     const dumper = new AstDumper();
-    //const astDump = dumper.dump();
-    //console.log(astDump);
+    const astDump = dumper.dump();
+    console.log(astDump);
 
     // We want the wrapper statement around the pragma, not the pragma itself
     // as the wrapper statements both share the same parent (i.e., are on the same scope)
@@ -14,16 +14,18 @@ function main() {
         const beginWrapper = beginPragma.parent as WrapperStmt;
         let endWrapper = beginWrapper as WrapperStmt;
         const scope = beginWrapper.parent as Scope;
+        let foundBegin = false;
 
         for (const stmt of scope.children) {
-            let foundBegin = false;
-            if (stmt === beginWrapper) {
+
+            if (stmt.astId === beginWrapper.astId) {
                 foundBegin = true;
                 continue;
             }
 
             if (stmt instanceof WrapperStmt) {
                 const pragma = stmt.children[0];
+
                 if (pragma instanceof Pragma && pragma.content === "end_outline" && foundBegin) {
                     endWrapper = stmt;
                     break;
@@ -47,10 +49,10 @@ function processOutliningRegion(beginPragma: WrapperStmt, endPragma: WrapperStmt
     beginPragma.detach();
     endPragma.detach();
 
-    console.log("Beginning the outline process...");
+    console.log("\nBeginning the outline process...");
     const outliner = new Outliner();
     outliner.outline(begin, end);
-    console.log("Outlining finished!");
+    console.log("Outlining finished!\n");
 }
 
 main();

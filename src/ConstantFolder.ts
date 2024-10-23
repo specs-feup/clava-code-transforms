@@ -6,19 +6,8 @@ export default class ConstantFolder {
 
     constructor() { }
 
-    public doPassesUntilStop(maxPasses = 99): number {
-        let passes = 1;
-        let hasChanged = this.doPass();
-
-        while (hasChanged && passes < maxPasses) {
-            hasChanged = this.doPass();
-            passes++;
-        }
-        return passes;
-    }
-
-    public doPass(): boolean {
-        let hasChanged = false;
+    public doPass(): number {
+        let folds = 0;
 
         for (const op of Query.search(BinaryOp)) {
 
@@ -26,11 +15,11 @@ export default class ConstantFolder {
             const isLiteral2 = op.right instanceof IntLiteral || op.left instanceof FloatLiteral;
 
             if (isLiteral1 && isLiteral2) {
-                hasChanged = this.fold(op);
+                folds += this.fold(op) ? 1 : 0;
             }
         }
 
-        return hasChanged;
+        return folds;
     }
 
     private fold(op: BinaryOp): boolean {
@@ -71,7 +60,7 @@ export default class ConstantFolder {
     }
 
     private doOperation(kind: string, n1: number, n2: number, isFloat: boolean): Literal | null {
-        console.log(`[ConstantFolder] Folding constants ${n1} and ${n2} using ${kind} (${isFloat ? "float" : "int"} output)`);
+        //console.log(`[ConstantFolder] Folding constants ${n1} and ${n2} using ${kind} (${isFloat ? "float" : "int"} output)`);
 
         let res: number = 0;
 
