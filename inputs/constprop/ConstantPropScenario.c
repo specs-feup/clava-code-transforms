@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+int globalO;
 const int globalN = 55;
 int globalM = 16;
 const int globalL = 55 * 16;
@@ -15,6 +16,8 @@ int intAndInt(int a, int b)
     a = b + 3;
     int f = a + a;
     c = 2;
+    int X[3000] = {0};
+    X[globalM] = 3;
     if (c == 2)
     {
         int x = a + b;

@@ -22,13 +22,24 @@ export abstract class ConstantFolder {
         return folds;
     }
 
+    public static getLiteralValue(lit: Literal): number {
+        if (lit instanceof IntLiteral) {
+            return lit.value;
+        }
+        else if (lit instanceof FloatLiteral) {
+            return lit.value;
+        }
+        else if (lit instanceof BoolLiteral) {
+            return lit.value ? 1 : 0;
+        }
+        return NaN;
+    }
+
     protected abstract getBinaryOps(): BinaryOp[];
 
     private fold(op: BinaryOp): boolean {
         const leftLit = op.left;
         const rightLit = op.right;
-
-        console.log(op.code);
 
         let n1: number = NaN;
         let n2: number = NaN;
@@ -54,7 +65,6 @@ export abstract class ConstantFolder {
 
         const newLit = this.doOperation(op.kind, n1, n2, isFloat);
         const val = newLit != null ? (newLit instanceof FloatLiteral || newLit instanceof IntLiteral ? newLit.value : "NaN") : "NaN";
-        console.log(`Folding ${n1} ${op.kind} ${n2} = ${val}`);;
 
         if (newLit == null) {
             return false;

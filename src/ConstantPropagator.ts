@@ -1,7 +1,94 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import { BinaryOp, DeclStmt, ExprStmt, FunctionJp, If, Literal, Loop, ReturnStmt, Scope, Statement, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, BinaryOp, DeclStmt, ExprStmt, FloatLiteral, FunctionJp, If, IntLiteral, Literal, Loop, ReturnStmt, Statement, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ConstantFolder } from "./ConstantFolder.js";
 
-export default class ConstantPropagator {
+interface PropagationPass {
+    doPass(): number;
+}
+
+export class GlobalConstantPropagator implements PropagationPass {
+    constructor() { }
+
+    public doPass(): number {
+        let replacements = 0;
+        const globalVars = this.getGlobalVars();
+        const constGlobals = this.getConstantGlobals(globalVars);
+
+        for (const [name, lit] of constGlobals.entries()) {
+            replacements += this.replaceRefs(name, lit);
+        }
+
+        return replacements;
+    }
+
+    private getGlobalVars(): Map<string, Literal> {
+        const globalVars: Map<string, Literal> = new Map();
+
+        for (const vardecl of Query.search(Vardecl)) {
+            if (vardecl.children.length == 0 || !vardecl.isGlobal) {
+                continue;
+            }
+
+            if (vardecl.children[0] instanceof Literal) {
+                const lit = vardecl.children[0] as Literal;
+
+                globalVars.set(vardecl.name, lit);
+            }
+        }
+        return globalVars;
+    }
+
+    private getConstantGlobals(globalVars: Map<string, Literal>): Map<string, Literal> {
+        const constGlobals: Map<string, Literal> = new Map();
+
+        for (const [name, value] of globalVars.entries()) {
+            let changed = false;
+
+            for (const varref of Query.search(Varref, { name: name })) {
+                changed = this.isAssignment(varref);
+            }
+            if (!changed) {
+                constGlobals.set(name, value);
+            }
+        }
+        return constGlobals;
+    }
+
+    private isAssignment(varref: Varref): boolean {
+        const parentOp = varref.getAncestor("binaryOp") as BinaryOp;
+        if (parentOp == undefined) {
+            return false;
+        }
+        if (parentOp.kind != "assign") {
+            return false;
+        }
+        if (varref.parent instanceof ArrayAccess) {
+            return false;
+        }
+
+        const isOnRight = Query.searchFrom(parentOp.right, Varref, { name: varref.name }).first() != null;
+        if (isOnRight) {
+            return false;
+        }
+
+        return false;
+    }
+
+    private replaceRefs(name: string, literal: Literal): number {
+        const toReplace: Varref[] = [];
+
+        for (const varref of Query.search(Varref, { name: name })) {
+            toReplace.push(varref);
+        }
+
+        for (const varref of toReplace) {
+            varref.replaceWith(literal.copy());
+        }
+        return toReplace.length;
+    }
+}
+
+export class FunctionConstantPropagator implements PropagationPass {
     private fun: FunctionJp;
 
     constructor(fun: FunctionJp) {
