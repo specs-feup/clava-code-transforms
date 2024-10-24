@@ -3,6 +3,7 @@
 const int globalN = 55;
 int globalM = 16;
 const int globalL = 55 * 16;
+int globalK = 880 * 131;
 
 int intAndInt(int a, int b)
 {

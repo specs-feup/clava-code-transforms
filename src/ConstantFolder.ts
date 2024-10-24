@@ -1,15 +1,15 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, BoolLiteral, FloatLiteral, IntLiteral, Literal } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, BoolLiteral, FloatLiteral, FunctionJp, IntLiteral, Literal, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 
-export default class ConstantFolder {
+export abstract class ConstantFolder {
 
     constructor() { }
 
     public doPass(): number {
         let folds = 0;
 
-        for (const op of Query.search(BinaryOp)) {
+        for (const op of this.getBinaryOps()) {
 
             const isLiteral1 = op.left instanceof IntLiteral || op.left instanceof FloatLiteral;
             const isLiteral2 = op.right instanceof IntLiteral || op.left instanceof FloatLiteral;
@@ -21,6 +21,8 @@ export default class ConstantFolder {
 
         return folds;
     }
+
+    protected abstract getBinaryOps(): BinaryOp[];
 
     private fold(op: BinaryOp): boolean {
         const leftLit = op.left;
@@ -60,8 +62,6 @@ export default class ConstantFolder {
     }
 
     private doOperation(kind: string, n1: number, n2: number, isFloat: boolean): Literal | null {
-        //console.log(`[ConstantFolder] Folding constants ${n1} and ${n2} using ${kind} (${isFloat ? "float" : "int"} output)`);
-
         let res: number = 0;
 
         switch (kind) {
@@ -154,5 +154,40 @@ export default class ConstantFolder {
             const flooredN = Math.floor(n);
             return ClavaJoinPoints.integerLiteral(flooredN);
         }
+    }
+}
+
+export class FunctionConstantFolder extends ConstantFolder {
+    private fun: FunctionJp;
+
+    constructor(fun: FunctionJp) {
+        super();
+        this.fun = fun;
+    }
+
+    protected getBinaryOps(): BinaryOp[] {
+        const ops: BinaryOp[] = [];
+
+        for (const op of Query.searchFrom(this.fun, BinaryOp)) {
+            ops.push(op);
+        }
+
+        return ops;
+    }
+}
+
+export class GlobalConstantFolder extends ConstantFolder {
+    protected getBinaryOps(): BinaryOp[] {
+        const ops: BinaryOp[] = [];
+
+        for (const global of Query.search(Vardecl)) {
+            if (global.isGlobal && global.hasInit) {
+                for (const op of Query.searchFrom(global, BinaryOp)) {
+                    ops.push(op);
+                }
+            }
+
+        }
+        return ops;
     }
 }

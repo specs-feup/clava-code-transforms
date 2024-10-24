@@ -1,25 +1,30 @@
-import ConstantFolder from "./ConstantFolder.js";
+import { FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import ConstantPropagator from "./ConstantPropagator.js";
-
+import { FunctionConstantFolder, GlobalConstantFolder } from "./ConstantFolder.js";
 
 export default class FoldingPropagationCombiner {
     constructor() { }
 
-    public doPassesUntilStop(maxPasses = 99, minPasses = 2) {
-        const constFolder = new ConstantFolder();
-        const constPropagator = new ConstantPropagator();
+    public doPassesUntilStop(fun: FunctionJp, maxPasses: number = 99, minPasses: number = 2): number {
+        const globalConstFolder = new GlobalConstantFolder();
+        const funConstFolder = new FunctionConstantFolder(fun);
+
+        const constPropagator = new ConstantPropagator(fun);
 
         let passes: number = 1;
         let keepGoing = true;
 
         do {
-            const foldingChanges = constFolder.doPass();
+            const globalFolds = globalConstFolder.doPass();
+            const funFolds = funConstFolder.doPass();
+            const totalFolds = globalFolds + funFolds;
+
             const propChanges = constPropagator.doPass();
 
-            console.log(`[FoldingPropagationCombiner] Folded ${foldingChanges} expressions and replaced ${propChanges} vars by constants in pass ${passes}`);
+            console.log(`[FoldingPropagationCombiner] Pass ${passes}: function=${fun.name}, globalFolds=${globalFolds}, funFolds=${funFolds}, propagations=${propChanges}`);
 
             passes++;
-            const cond1 = foldingChanges > 0 || propChanges > 0;
+            const cond1 = totalFolds > 0 || propChanges > 0;
             const cond2 = passes < maxPasses;
             const cond3 = passes < minPasses;
             keepGoing = (cond1 && cond2) || cond3;
