@@ -3,7 +3,11 @@ import { FunctionConstantPropagator, GlobalConstantPropagator } from "./Constant
 import { FunctionConstantFolder, GlobalConstantFolder } from "./ConstantFolder.js";
 
 export default class FoldingPropagationCombiner {
-    constructor() { }
+    private silent;
+
+    constructor(silent: boolean = true) {
+        this.silent = silent;
+    }
 
     public doPassesUntilStop(fun: FunctionJp, maxPasses: number = 99, minPasses: number = 2): number {
         const globalConstFolder = new GlobalConstantFolder();
@@ -15,7 +19,9 @@ export default class FoldingPropagationCombiner {
         let passes: number = 1;
         let keepGoing = true;
 
-        console.log(`[FoldingPropagationCombiner] Starting passes for function: ${fun.name}`);
+        if (!this.silent) {
+            console.log(`[FoldingPropagationCombiner] Starting passes for function: ${fun.name}`);
+        }
         do {
             const globalFolds = globalConstFolder.doPass();
             const funFolds = funConstFolder.doPass();
@@ -25,7 +31,9 @@ export default class FoldingPropagationCombiner {
             const funProps = funPropagator.doPass();
             const totalProps = globalProps + funProps;
 
-            console.log(`[FoldingPropagationCombiner] --- Pass ${passes}: GF=${globalFolds}, FF=${funFolds}, GP=${globalProps}, FP=${funProps}`);
+            if (!this.silent) {
+                console.log(`[FoldingPropagationCombiner] --- Pass ${passes}: GF=${globalFolds}, FF=${funFolds}, GP=${globalProps}, FP=${funProps}`);
+            }
 
             passes++;
             const cond1 = totalFolds > 0 || totalProps > 0;

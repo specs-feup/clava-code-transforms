@@ -10,7 +10,7 @@ function main() {
 
     const funs: string[] = ["intAndInt", "intAndFloat", "kinds"];
 
-    const constPropComb = new FoldingPropagationCombiner();
+    const constPropComb = new FoldingPropagationCombiner(false);
     for (const funName of funs) {
         const fun = Query.search(FunctionJp, { name: funName }).first()!;
 
