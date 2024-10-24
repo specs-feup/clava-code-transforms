@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import { ArrayAccess, BinaryOp, DeclStmt, ExprStmt, FloatLiteral, FunctionJp, If, IntLiteral, Literal, Loop, ReturnStmt, Statement, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
-import { ConstantFolder } from "./ConstantFolder.js";
+import { ArrayAccess, BinaryOp, DeclStmt, ExprStmt, FunctionJp, If, Literal, Loop, ReturnStmt, Statement, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ExpressionPropagation } from "./constfolding/ExpressionPropagation.js";
 
 interface PropagationPass {
     doPass(): number;
@@ -193,62 +193,8 @@ export class FunctionConstantPropagator implements PropagationPass {
     }
 
     private propagateInExpr(stmt: ExprStmt, varName: string, lit: Literal): [number, boolean] {
-        // Expr structure: a = expr;
-        if (stmt.children[0] instanceof BinaryOp && stmt.children[0].kind == "assign") {
-            const op = stmt.children[0] as BinaryOp;
-
-            // Expression type: a = b;
-            if (op.right instanceof Varref && op.left instanceof Varref) {
-                const leftVarref = op.left as Varref;
-                const rightVarref = op.right as Varref;
-
-                if (rightVarref.name === varName && leftVarref.name !== varName) {
-                    op.replaceWith(lit);
-                    return [1, true];   // foo = var;
-                }
-                else if (rightVarref.name === varName) {
-                    return [0, false];  // var = _;
-                }
-                else {
-                    return [0, true];   // _ = _;
-                }
-            }
-            // Expression type: a = b op *;
-            else if (op.left instanceof Varref && op.right instanceof BinaryOp) {
-                const subOperand = op.right as BinaryOp;
-                let replacements = 0;
-
-                const toReplace: Varref[] = [];
-                for (const varref of Query.searchFrom(subOperand, Varref, { name: varName })) {
-                    toReplace.push(varref);
-                    replacements++;
-                }
-                toReplace.forEach((varref) => { varref.replaceWith(lit); });
-
-                return [replacements, true];
-            }
-            // Expression type: a = lit;
-            else if (op.left instanceof Varref && op.right instanceof Literal) {
-                const leftVarref = op.left as Varref;
-                if (leftVarref.name === varName) {
-                    return [0, false];
-                }
-                else {
-                    return [0, true];
-                }
-            }
-            // Expression type: idk
-            else {
-                console.log(`[ConstantPropagator] Unsupported ExprStmt type: ${stmt.code}`);
-                return [0, true];
-            }
-
-        }
-        // Expr type: all others not yet implemented
-        else {
-            console.log(`[ConstantPropagator] Unsupported ExprStmt structure: ${stmt.code}`);
-            return [0, true];
-        }
+        const exprProp = new ExpressionPropagation();
+        return exprProp.propagate(stmt, varName, lit);
     }
 
     private propagateInDecl(stmt: DeclStmt, varName: string, lit: Literal): [number, boolean] {

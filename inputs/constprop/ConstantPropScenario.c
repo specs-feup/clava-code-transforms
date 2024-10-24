@@ -6,34 +6,13 @@ int globalM = 16;
 const int globalL = 55 * 16;
 int globalK = 880 * 131;
 
-int intAndInt(int a, int b)
-{
-    int c = 2;
-    int d = 3;
-    int e = 2 + 3;
-    a = b + e;
-    b = e + e;
-    a = b + 3;
-    int f = a + a;
-    c = 2;
-    int X[3000] = {0};
-    X[globalM] = 3;
-    if (c == 2)
-    {
-        int x = a + b;
-        a = 44;
-        int y = a + b;
-        f = x + y;
-    }
-    return f;
-}
-
 float intAndFloat(int a, float b)
 {
     int c = 2;
     int d = 3;
     float e = 2 + 3.4;
     b = e + e;
+    intAndFloat(b, e);
 
     for (int i = 0; i < globalN; i++)
     {
@@ -48,6 +27,32 @@ float intAndFloat(int a, float b)
         b = b + 1;
     }
     return b;
+}
+
+int intAndInt(int a, int b)
+{
+    int c = 2;
+    int d = 3;
+    int e = 2 + 3;
+    a = b + e;
+    b = e + e;
+    a = b + 3;
+    int f = a + a;
+    c = 2;
+    int X[3000] = {0};
+    X[globalM] = c;
+    X[c] = 12;
+    X[d] = c;
+    intAndFloat(X[d], 1.3);
+
+    if (c == 2)
+    {
+        int x = a + b;
+        a = 44;
+        int y = a + b;
+        f = x + y;
+    }
+    return f;
 }
 
 void kinds()
