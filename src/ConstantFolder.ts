@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, BoolLiteral, FloatLiteral, FunctionJp, IntLiteral, Literal, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, BoolLiteral, FloatLiteral, FunctionJp, IntLiteral, Literal, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
 
 export abstract class ConstantFolder {
 
@@ -11,8 +11,8 @@ export abstract class ConstantFolder {
 
         for (const op of this.getBinaryOps()) {
 
-            const isLiteral1 = op.left instanceof IntLiteral || op.left instanceof FloatLiteral;
-            const isLiteral2 = op.right instanceof IntLiteral || op.left instanceof FloatLiteral;
+            const isLiteral1 = op.left instanceof Literal;
+            const isLiteral2 = op.right instanceof Literal;
 
             if (isLiteral1 && isLiteral2) {
                 folds += this.fold(op) ? 1 : 0;
@@ -27,6 +27,8 @@ export abstract class ConstantFolder {
     private fold(op: BinaryOp): boolean {
         const leftLit = op.left;
         const rightLit = op.right;
+
+        console.log(op.code);
 
         let n1: number = NaN;
         let n2: number = NaN;
@@ -51,6 +53,8 @@ export abstract class ConstantFolder {
         const isFloat = leftLit instanceof FloatLiteral || rightLit instanceof FloatLiteral;
 
         const newLit = this.doOperation(op.kind, n1, n2, isFloat);
+        const val = newLit != null ? (newLit instanceof FloatLiteral || newLit instanceof IntLiteral ? newLit.value : "NaN") : "NaN";
+        console.log(`Folding ${n1} ${op.kind} ${n2} = ${val}`);;
 
         if (newLit == null) {
             return false;

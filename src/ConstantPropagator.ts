@@ -109,7 +109,6 @@ export default class ConstantPropagator {
         // Expr structure: a = expr;
         if (stmt.children[0] instanceof BinaryOp && stmt.children[0].kind == "assign") {
             const op = stmt.children[0] as BinaryOp;
-            console.log("op: " + op.left.joinPointType + " <-- " + op.kind + " --> " + op.right.joinPointType);
 
             // Expression type: a = b;
             if (op.right instanceof Varref && op.left instanceof Varref) {
@@ -130,7 +129,6 @@ export default class ConstantPropagator {
             // Expression type: a = b op *;
             else if (op.left instanceof Varref && op.right instanceof BinaryOp) {
                 const subOperand = op.right as BinaryOp;
-                console.log("suboperand: " + subOperand.left.joinPointType + " <-- " + subOperand.kind + " --> " + subOperand.right.joinPointType);
                 let replacements = 0;
 
                 const toReplace: Varref[] = [];
