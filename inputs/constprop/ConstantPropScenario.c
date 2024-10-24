@@ -14,6 +14,7 @@ int intAndInt(int a, int b)
     b = e + e;
     a = b + 3;
     int f = a + a;
+    c = 2;
     if (c == 2)
     {
         int x = a + b;

@@ -14,6 +14,7 @@ export default class FoldingPropagationCombiner {
         let passes: number = 1;
         let keepGoing = true;
 
+        console.log(`[FoldingPropagationCombiner] Starting passes for function: ${fun.name}`);
         do {
             const globalFolds = globalConstFolder.doPass();
             const funFolds = funConstFolder.doPass();
@@ -21,7 +22,7 @@ export default class FoldingPropagationCombiner {
 
             const propChanges = constPropagator.doPass();
 
-            console.log(`[FoldingPropagationCombiner] Pass ${passes}: function=${fun.name}, globalFolds=${globalFolds}, funFolds=${funFolds}, propagations=${propChanges}`);
+            console.log(`[FoldingPropagationCombiner] --- Pass ${passes}: globalFolds=${globalFolds}, funFolds=${funFolds}, propagations=${propChanges}`);
 
             passes++;
             const cond1 = totalFolds > 0 || propChanges > 0;

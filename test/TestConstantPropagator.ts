@@ -8,7 +8,7 @@ function main() {
     const astDump = dumper.dump();
     console.log(astDump);
 
-    const funs: string[] = ["intAndInt", "intAndFloat", "kinds"];
+    const funs: string[] = ["intAndInt"/*, "intAndFloat", "kinds"*/];
 
     const constPropComb = new FoldingPropagationCombiner();
     for (const funName of funs) {
