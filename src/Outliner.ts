@@ -112,6 +112,7 @@ export default class Outliner {
 
         //------------------------------------------------------------------------------
         const callArgs = this.createArgs(fun, prologue, parentFun);
+        console.log("args: " + callArgs.map(arg => arg.code) + ", params: " + funParams.map(param => param.code));
         let call = this.createCall(callPlaceholder, fun, callArgs);
         this.printMsg("Successfully created call to \"" + functionName + "\"");
 
@@ -341,6 +342,9 @@ export default class Outliner {
                         if (ref.type instanceof BuiltinType || ref.type instanceof TypedefType || ref.type instanceof ElaboratedType) {
                             const addressOfScalar = ClavaJoinPoints.unaryOp("&", ref);
                             args.push(addressOfScalar);
+                        }
+                        else {
+                            args.push(ref);
                         }
                     }
                     else {
