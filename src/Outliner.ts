@@ -112,7 +112,6 @@ export default class Outliner {
 
         //------------------------------------------------------------------------------
         const callArgs = this.createArgs(fun, prologue, parentFun);
-        console.log("args: " + callArgs.map(arg => arg.code) + ", params: " + funParams.map(param => param.code));
         let call = this.createCall(callPlaceholder, fun, callArgs);
         this.printMsg("Successfully created call to \"" + functionName + "\"");
 
@@ -289,19 +288,6 @@ export default class Outliner {
         return [beginWrapper, endWrapper];
     }
 
-    /**
-     * @deprecated - use .getAncestor(FunctionJp) instead
-     */
-    private findParentFunction(jp: Joinpoint): FunctionJp | null {
-        while (!(jp instanceof FunctionJp)) {
-            if (jp instanceof File) {
-                return null;
-            }
-            jp = jp.parent;
-        }
-        return jp;
-    }
-
     private findGlobalVars() {
         const globals = [];
         for (const decl of Query.search(Vardecl)) {
@@ -375,10 +361,12 @@ export default class Outliner {
             this.printMsg("Found " + returnStmts.length + " return statement(s) in the outline region");
         }
 
-        if (params.length == 0) {
-            params.push(ClavaJoinPoints.param("dummy", ClavaJoinPoints.type("int")));
-        }
         const fun = ClavaJoinPoints.functionDecl(name, retType, ...params);
+        // const fun = ClavaJoinPoints.functionDecl(name, retType);
+        // for (const param of params) {
+        //     fun.addParam(param.name, param.type);
+        // }
+
         oldFun.insertBefore(fun);
         const scope = ClavaJoinPoints.scope();
         fun.setBody(scope);
@@ -493,8 +481,13 @@ export default class Outliner {
                         varrefsNames.push(varref.name);
                     }
                 } catch (e) {
-                    console.error(e);
-                    console.log(varref.code);
+                    if (e instanceof Error) {
+                        this.printMsg(e.stack as string);
+                    }
+                    else {
+                        this.printMsg("(No stack trace available)");
+                    }
+                    this.printMsg("Exception while fetching varref with code " + varref.code);
                 }
             }
         }
