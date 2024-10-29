@@ -1,5 +1,5 @@
 {
-  "name": "clava-code-transformations",
+  "name": "clava-code-transforms",
   "version": "1.0.0",
   "author": "tiagolascasas",
   "description": "A set of advanced C/C++ code transformations for Clava",
