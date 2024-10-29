@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Loop, Param, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Joinpoint, Loop, Param, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
@@ -88,27 +88,37 @@ export default class Voidifier {
 
     private handleAssignmentCall(call: Call, fun: FunctionJp): void {
         const parent = call.parent as BinaryOp; // TS: should be safe, as it was checked before calling this method
-        let newArg: Expression;
+        const lvalue = parent.left;
+        const newArg = this.getArgumentFromLhs(lvalue);
 
-        if (parent.left instanceof Varref) {
-            const parentVarref = parent.left as Varref;
-            const newRef = ClavaJoinPoints.varRef(parentVarref.vardecl);    // TS: possibly dangerous, needs to be checked
-            newArg = ClavaJoinPoints.unaryOp("&", newRef);
-        }
-        else if (parent.left instanceof ArrayAccess) {
-            newArg = ClavaJoinPoints.unaryOp("&", parent.left);
-        }
-        else if (parent.left instanceof UnaryOp && parent.left.kind == "deref") {
-            newArg = parent.left.children[0] as Expression; // TS: possibly dangerous, needs to be checked
-        }
-        else {
-            throw new Error("[Voidifier] Unexpected lhs of call: " + parent.left.joinPointType + "\nOn source code line: " + parent.parent.code);
-        }
         // the pointer may need to be casted if there are signed/unsigned mismatches
         const newCastedArg = this.applyCasting(newArg, fun);
 
         const newCall = this.buildCall(fun, call, newCastedArg);
         parent.replaceWith(newCall);
+    }
+
+    private getArgumentFromLhs(lhs: Expression): Expression {
+        let newArg: Expression;
+
+        if (lhs instanceof Varref) {
+            const newRef = ClavaJoinPoints.varRef(lhs.vardecl);
+            newArg = ClavaJoinPoints.unaryOp("&", newRef);
+        }
+        else if (lhs instanceof ArrayAccess) {
+            newArg = ClavaJoinPoints.unaryOp("&", lhs);
+        }
+        else if (lhs instanceof ParenExpr) {
+            const inner = lhs.subExpr;
+            newArg = this.getArgumentFromLhs(inner);
+        }
+        else if (lhs instanceof UnaryOp && lhs.kind == "deref") {
+            newArg = lhs.children[0] as Expression;
+        }
+        else {
+            throw new Error("Unsupported lvalue type");
+        }
+        return newArg;
     }
 
     private handleIsolatedCall(call: Call, fun: FunctionJp, retVarType: Type): void {
