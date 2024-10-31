@@ -2,7 +2,7 @@ import { FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import { FunctionConstantPropagator, GlobalConstantPropagator } from "./ConstantPropagator.js";
 import { FunctionConstantFolder, GlobalConstantFolder } from "./ConstantFolder.js";
 
-export default class FoldingPropagationCombiner {
+export class FoldingPropagationCombiner {
     private silent;
 
     constructor(silent: boolean = true) {

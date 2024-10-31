@@ -1,5 +1,5 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import Voidifier from "../src/Voidifier.js";
+import { Voidifier } from "../src/Voidifier.js";
 import { FunctionJp, Statement } from "@specs-feup/clava/api/Joinpoints.js";
 import StatementDecomposer from "@specs-feup/clava/api/clava/code/StatementDecomposer.js";
 import NormalizeToSubset from "@specs-feup/clava/api/clava/opt/NormalizeToSubset.js";

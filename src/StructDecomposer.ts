@@ -1,15 +1,16 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, Call, FunctionJp, Joinpoint, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { BinaryOp, Call, FloatLiteral, FunctionJp, ImplicitValue, InitList, IntLiteral, Joinpoint, Literal, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { AstDumper } from "../test/AstDumper.js";
 
 export class StructDecomposer {
-    silent;
+    private silent;
 
-    constructor(silent = false) {
+    constructor(silent: boolean = false) {
         this.silent = silent;
     }
 
-    public decomposeAll() {
+    public decomposeAll(): string[] {
         const structs: { [key: string]: Struct } = {};
 
         for (const struct of Query.search(Struct)) {
@@ -28,7 +29,7 @@ export class StructDecomposer {
         return decompNames;
     }
 
-    public decomposeByName(nameOrNames: any) {
+    public decomposeByName(nameOrNames: string | string[]): string[] {
         const names = Array.isArray(nameOrNames) ? nameOrNames : [nameOrNames];
         this.log(`Structs to decompose: ${names.join(", ")}`);
 
@@ -47,7 +48,7 @@ export class StructDecomposer {
         return decompNames;
     }
 
-    public decompose(struct: Struct, name: string) {
+    public decompose(struct: Struct, name: string): void {
         this.log(`Decomposing struct "${name}"`);
 
         const decls = this.getAllDeclsOfStruct(name);
@@ -67,19 +68,15 @@ export class StructDecomposer {
         for (const param of params) {
             this.removeStructParam(param);
         }
-
-        for (const decl of decls) {
-            this.removeInits(decl, struct);
-        }
     }
 
-    private log(msg: string) {
+    private log(msg: string): void {
         if (!this.silent) {
             console.log(`[StructDecomp] ${msg}`);
         }
     }
 
-    private getStructName(struct: Struct) {
+    private getStructName(struct: Struct): string {
         let name: string = struct.name;
 
         // typedef struct { ... } typedef_name;
@@ -91,7 +88,7 @@ export class StructDecomposer {
         return name;
     }
 
-    private getAllDeclsOfStruct(name: string) {
+    private getAllDeclsOfStruct(name: string): Vardecl[] {
         const decls = [];
 
         for (const decl of Query.search(Vardecl)) {
@@ -106,7 +103,7 @@ export class StructDecomposer {
         return decls;
     }
 
-    private getAllParamsOfStruct(name: string) {
+    private getAllParamsOfStruct(name: string): Param[] {
         const params = [];
 
         for (const decl of Query.search(Param)) {
@@ -123,18 +120,26 @@ export class StructDecomposer {
         return params;
     }
 
-    private decomposeDecl(decl: Vardecl, struct: Struct) {
+    private decomposeDecl(decl: Vardecl, struct: Struct): [string, Vardecl][] {
         // Find all struct decls (local and global), and create vars for each field
-        const newVars = this.createNewVars(decl, struct);
+        const newVars: [string, Vardecl][] = decl.hasInit ?
+            this.createNewVarsWithInit(decl, struct) :
+            this.createNewVarsNoInit(decl, struct);
+
+        for (const [fieldName, newVar] of newVars.reverse()) {
+            decl.insertAfter(newVar);
+        }
 
         // Replace all references to the struct fields with the new vars
         this.replaceFieldRefs(decl, newVars);
 
         // Replace all references to the struct itself in function calls
         this.replaceRefsInCalls(decl, newVars);
+
+        return newVars;
     }
 
-    private decomposeParam(param: Param, struct: Struct) {
+    private decomposeParam(param: Param, struct: Struct): void {
         // Find all struct params, and create params for each field
         const newParams = this.createNewParams(param, struct);
 
@@ -142,7 +147,7 @@ export class StructDecomposer {
         this.replaceFieldRefs(param, newParams);
     }
 
-    private createNewVars(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+    private createNewVarsNoInit(decl: Vardecl, struct: Struct): [string, Vardecl][] {
         const newVars: [string, Vardecl][] = [];
         const declName = decl.name;
 
@@ -156,11 +161,31 @@ export class StructDecomposer {
             }
 
             const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, fieldType);
-            decl.insertAfter(newVar);
             newVars.push([fieldName, newVar]);
         }
 
         return newVars;
+    }
+
+    private createNewVarsWithInit(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+        console.log("Init: " + decl.code + "\n");
+        const ast = new AstDumper().dump(decl);
+        console.log(ast);
+
+        let initVars: [string, Vardecl][] = [];
+
+        const decomposers: StructInitDecomposer[] = [
+            new DirectListAssignment()
+        ];
+        for (const decomposer of decomposers) {
+            if (!decomposer.validate(decl, struct)) {
+                continue;
+            }
+            else {
+                return decomposer.decompose(decl, struct);
+            }
+        }
+        return initVars;
     }
 
     private createNewParams(param: Param, struct: Struct): [string, Param][] {
@@ -208,7 +233,7 @@ export class StructDecomposer {
         return newParams;
     }
 
-    private replaceFieldRefs(decl: Vardecl, newVars: [string, Vardecl][]) {
+    private replaceFieldRefs(decl: Vardecl, newVars: [string, Vardecl][]): void {
         const declName = decl.name;
 
         let startingPoint;
@@ -255,7 +280,7 @@ export class StructDecomposer {
         }
     }
 
-    private replaceRefsInCalls(decl: Vardecl, newVars: [string, Vardecl][]) {
+    private replaceRefsInCalls(decl: Vardecl, newVars: [string, Vardecl][]): void {
         const declName = decl.name;
 
         let startingPoint;
@@ -303,7 +328,7 @@ export class StructDecomposer {
     }
 
 
-    private makeNewCall(call: Call, idxToReplace: Map<number, Varref>, newVars: [string, Vardecl][], decl: Vardecl) {
+    private makeNewCall(call: Call, idxToReplace: Map<number, Varref>, newVars: [string, Vardecl][], decl: Vardecl): Call {
         const finalArgList = [];
 
         for (let i = 0; i < call.args.length; i++) {
@@ -326,7 +351,7 @@ export class StructDecomposer {
         return newCall;
     }
 
-    private makeNewArgs(arg: Varref, newVars: [string, Vardecl][]) {
+    private makeNewArgs(arg: Varref, newVars: [string, Vardecl][]): (Varref | UnaryOp)[] {
         const newArgs = [];
 
         let isAddrOf = false;
@@ -356,7 +381,7 @@ export class StructDecomposer {
         return newArgs;
     }
 
-    private removeStructParam(param: Param) {
+    private removeStructParam(param: Param): void {
         const fun = param.parent as FunctionJp;
         const newParams = [];
 
@@ -367,8 +392,66 @@ export class StructDecomposer {
         }
         fun.setParams(newParams);
     }
+}
 
-    private removeInits(decl: Vardecl, struct: Struct) {
-        this.log("Warning: init removal is not implemented yet");
+interface StructInitDecomposer {
+    validate(decl: Vardecl, struct: Struct): boolean;
+    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][];
+}
+
+/**
+ * Decomposes struct initializations that are done by direct list assignment,
+ * of AST structure like:
+ * >vardecl
+ * ->initList
+ * -->intLiteral
+ * -->floatLiteral
+ * -->literal
+ * Examples:
+ * Data dataInit1 = {102, 98.9, "Sample Data 1"}
+ * Data dataInit2 = {.id = 103, .value = 97.9, .name = "Sample Data 2"}
+ * Data dataInit3 = {.value = 96.9, .id = 104, .name = "Sample Data 3"}
+ * Data dataInit4 = {5}
+ * Data dataInit5 = {.id = 105}
+ */
+class DirectListAssignment implements StructInitDecomposer {
+    validate(decl: Vardecl, struct: Struct): boolean {
+        const cond1 = decl.children.length === 1;
+        if (!cond1) {
+            return false;
+        }
+        if (!(decl.children[0] instanceof InitList)) {
+            return false;
+        }
+        return true;
+    }
+
+    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+        const newVars: [string, Vardecl][] = [];
+
+        const initList = decl.children[0] as InitList;
+        const fields = struct.fields;
+        for (let i = 0; i < fields.length; i++) {
+            const field = fields[i];
+            const fieldName = field.name;
+            const fieldInit = initList.children[i];
+            const newVarName = `${decl.name}_${fieldName}`;
+
+            if (fieldInit instanceof ImplicitValue) {
+                const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, field.type);
+                newVars.push([fieldName, newVar]);
+            }
+            else if (fieldInit instanceof Literal) {
+                const newVar = ClavaJoinPoints.varDecl(newVarName, fieldInit.copy());
+                newVars.push([fieldName, newVar]);
+            }
+            else {
+                console.log(`[DirectListAssignment] Unknown initialized of type ${fieldInit.joinPointType}`);
+                const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, field.type);
+                newVars.push([fieldName, newVar]);
+            }
+        }
+
+        return newVars;
     }
 }

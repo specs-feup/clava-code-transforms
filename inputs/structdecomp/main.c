@@ -136,6 +136,7 @@ int main()
     Data dataInit2 = {.id = 103, .value = 97.9, .name = "Sample Data 2"};
     Data dataInit3 = {.value = 96.9, .id = 104, .name = "Sample Data 3"};
     Data dataInit4 = {5};
+    int aSillyInteger = 6;
     Data dataInit5 = {.id = 105};
     Data *dataInit6 = &(Data){106, 95.9, "Sample Data 6"};
     Data *dataInit7 = &(Data){.id = 107, .value = 94.9, .name = "Sample Data 7"};

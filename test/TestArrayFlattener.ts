@@ -1,6 +1,6 @@
 import { FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
-import ArrayFlattener from "../src/ArrayFlattener.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
+import { ArrayFlattener } from "../src/ArrayFlattener.js";
 
 function main() {
 

@@ -1,22 +1,23 @@
-import { BinaryOp, Call, FileJp, FunctionJp, IntLiteral, Joinpoint, MemberAccess, Param, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
-import Query from "@specs-feup/lara/api/weaver/Query.js";
+import { BinaryOp, Call, FileJp, FloatLiteral, FunctionJp, IntLiteral, Joinpoint, MemberAccess, Param, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import Clava from "@specs-feup/clava/api/clava/Clava.js"
 
 export class AstDumper {
     #currentRes = "";
 
     constructor() { }
 
-    dump() {
+    dump(startJp?: Joinpoint): string {
         this.#currentRes = "";
-
-        for (const startJp of Query.search(FileJp)) {
-            this.#addLevelToResult(startJp.joinPointType, 0);
-
-            for (const child of startJp.children) {
-                this.#dumpJoinPoint(child, 1);
-            }
+        if (startJp == undefined) {
+            startJp = Clava.getProgram();
         }
-        return this.#currentRes.slice();
+
+        this.#addLevelToResult(startJp.joinPointType, 0);
+
+        for (const child of startJp.children) {
+            this.#dumpJoinPoint(child, 1);
+        }
+        return this.#currentRes;
     }
 
     #buildLabel(key: string, val: string) {
@@ -37,6 +38,9 @@ export class AstDumper {
         }
         if (jp instanceof FunctionJp) {
             str += this.#buildLabel("sig", jp.signature);
+        }
+        if (jp instanceof IntLiteral || jp instanceof FloatLiteral) {
+            str += this.#buildLabel("val", String(jp.value));
         }
         this.#addLevelToResult(str, indent);
 
