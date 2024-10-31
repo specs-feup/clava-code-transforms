@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, Call, FloatLiteral, FunctionJp, ImplicitValue, InitList, IntLiteral, Joinpoint, Literal, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { BinaryOp, Call, Cast, FloatLiteral, FunctionJp, ImplicitValue, InitList, IntLiteral, Joinpoint, Literal, MemberAccess, Param, Struct, Type, TypedefDecl, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { AstDumper } from "../test/AstDumper.js";
 
 export class StructDecomposer {
@@ -168,21 +168,23 @@ export class StructDecomposer {
     }
 
     private createNewVarsWithInit(decl: Vardecl, struct: Struct): [string, Vardecl][] {
-        console.log("Init: " + decl.code + "\n");
-        const ast = new AstDumper().dump(decl);
-        console.log(ast);
 
         let initVars: [string, Vardecl][] = [];
 
-        const decomposers: StructInitDecomposer[] = [
+        const decomposers: StructAssignmentDecomposer[] = [
             new DirectListAssignment(),
-            new PointerListAssignment()
+            new PointerListAssignment(),
+            new MallocAssignment()
         ];
         for (const decomposer of decomposers) {
             if (decomposer.validate(decl)) {
                 return decomposer.decompose(decl, struct);
             }
         }
+
+        this.log("Could not decompose init: " + decl.code + "\n");
+        const ast = new AstDumper().dump(decl);
+        console.log(ast);
         return initVars;
     }
 
@@ -191,7 +193,6 @@ export class StructDecomposer {
         const paramsOrdered = [];
         const declName = param.name;
 
-        console.log(`${param.filename}:${param.line}`);
         const fun = param.getAncestor("function") as FunctionJp;
 
         for (const field of struct.fields) {
@@ -392,7 +393,7 @@ export class StructDecomposer {
     }
 }
 
-interface StructInitDecomposer {
+interface StructAssignmentDecomposer {
     validate(decl: Vardecl): boolean;
     decompose(decl: Vardecl, struct: Struct): [string, Vardecl][];
 }
@@ -412,7 +413,7 @@ interface StructInitDecomposer {
  * Data dataInit4 = {5}
  * Data dataInit5 = {.id = 105}
  */
-class DirectListAssignment implements StructInitDecomposer {
+class DirectListAssignment implements StructAssignmentDecomposer {
     validate(decl: Vardecl): boolean {
         const cond1 = decl.children.length === 1;
         if (!cond1) {
@@ -473,7 +474,7 @@ class DirectListAssignment implements StructInitDecomposer {
  * Data *dataInit9 = &(Data){109}
  * Data *dataInit10 = &(Data){.id = 110}
  */
-class PointerListAssignment implements StructInitDecomposer {
+class PointerListAssignment implements StructAssignmentDecomposer {
     validate(decl: Vardecl): boolean {
         const cond1 = decl.children.length === 1;
         const cond2 = decl.children[0] instanceof UnaryOp && decl.children[0].kind === "addr_of";
@@ -519,5 +520,99 @@ class PointerListAssignment implements StructInitDecomposer {
         }
 
         return newVars;
+    }
+}
+
+/**
+ * Decomposes struct initializations that are done by assigning a list to a pointer,
+ * of AST structure like:
+ * >vardecl
+ * ->cast
+ * -->call  {fun: malloc}
+ * --->varref  {name: malloc}  {type: functionType}
+ * --->unaryExprOrType
+ * or
+ * >vardecl
+ * ->call  {fun: malloc}
+ * -->varref  {name: malloc}  {type: functionType}
+ * -->unaryExprOrType
+ * Examples:
+ * Data *dataInit12 = malloc(sizeof(Data))
+ * Data *dataInit13 = (Data *) malloc(sizeof(Data))
+ * Data *dataInit15 = (Data *) calloc(1, sizeof(Data))
+ * 
+ */
+class MallocAssignment implements StructAssignmentDecomposer {
+    validate(decl: Vardecl): boolean {
+        const cond1 = decl.children.length === 1;
+        if (!cond1) {
+            return false;
+        }
+        const possibleCall = decl.children[0] instanceof Cast ? decl.children[0].children[0] : decl.children[0];
+
+        if (possibleCall instanceof Call) {
+            const cond2 = ["calloc", "malloc"].includes(possibleCall.name);
+            if (!cond2) {
+                return false;
+            }
+
+            const lastArg = possibleCall.args[possibleCall.args.length - 1];
+            if (lastArg instanceof UnaryExprOrType) {
+                console.log(lastArg.kind);
+                console.log(lastArg.argType.code);
+                const isSizeof = lastArg.kind === "sizeof";
+                if (!isSizeof) {
+                    return false;
+                }
+                const isSameStruct = decl.type.code.indexOf(lastArg.argType.code) !== -1;
+                if (!isSameStruct) {
+                    console.log(`[MallocAssignment] Different types in malloc/calloc: ${decl.type.code} and ${lastArg.argType.code}`);
+                    return false;
+                }
+                return true;
+            }
+            else if (lastArg instanceof IntLiteral) {
+                const val = lastArg.value;
+                const structName = decl.type.code.replace("*", "").replace("struct ", "").trim();
+                console.log(`[MallocAssignment] malloc/calloc size with constant size ${val}, assuming this is enough for struct type ${structName}`);
+                return true;
+            }
+            else {
+                console.log(`[MallocAssignment] Unknown malloc/calloc size given by JP type ${lastArg.joinPointType}`);
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+    }
+
+    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+        const newVars: [string, Vardecl][] = [];
+
+        const fields = struct.fields;
+
+        for (let i = 0; i < fields.length; i++) {
+            const type = fields[i].type;
+            const pointerType = ClavaJoinPoints.pointer(type);
+            const fieldName = fields[i].name;
+            const newVarName = `${decl.name}_${fieldName}`;
+
+            const size = this.getDatatypeSize(type);
+            const sizeArg = ClavaJoinPoints.integerLiteral(size);
+
+            const call = ClavaJoinPoints.callFromName("malloc", ClavaJoinPoints.type("void*"), sizeArg);
+            const cast = ClavaJoinPoints.cStyleCast(pointerType, call);
+
+            const newVar = ClavaJoinPoints.varDecl(newVarName, cast);
+            newVars.push([fieldName, newVar]);
+        }
+
+        return newVars;
+    }
+
+    private getDatatypeSize(type: Type): number {
+
+        return 4;
     }
 }

@@ -147,9 +147,10 @@ int main()
     Data *dataInit11 = &(Data){111, 92.9, "Sample Data 11"};
 
     // Malloc assignment
-    Data *dataInit12 = (Data *)malloc(sizeof(Data));
-    Data *dataInit13 = malloc(sizeof(Data));
-
+    Data *dataInit12 = malloc(sizeof(Data));
+    Data *dataInit13 = (Data *)malloc(sizeof(Data));
+    Data *dataInit14 = (Data *)malloc(16);
+    Data *dataInit15 = (Data *)calloc(1, sizeof(Data));
     foo();
 
     return 0;
