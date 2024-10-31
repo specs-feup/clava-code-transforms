@@ -3,7 +3,7 @@ import { AdjustedType, ArrayType, BuiltinType, Call, DeclStmt, ElaboratedType, E
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
-export default class Outliner {
+export class Outliner {
     private verbose: boolean;
     private defaultPrefix: string;
 

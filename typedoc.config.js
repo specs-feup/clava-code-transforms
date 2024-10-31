@@ -1,6 +1,6 @@
 import { fileURLToPath } from "url";
 
 export default {
-  extends: [ fileURLToPath(import.meta.resolve("lara-js/typedoc.base.json")) ],
-  entryPoints: ["src/"],
+    extends: [fileURLToPath(import.meta.resolve("@specs-feup/lara/typedoc.base.json"))],
+    entryPoints: ["src/"],
 }

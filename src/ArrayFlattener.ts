@@ -3,7 +3,7 @@ import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
 
-export default class ArrayFlattener {
+export class ArrayFlattener {
     constructor() { }
 
     public flattenAllInFunction(fun: FunctionJp): number {

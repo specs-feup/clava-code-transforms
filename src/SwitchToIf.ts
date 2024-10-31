@@ -1,6 +1,6 @@
 import { Switch } from "@specs-feup/clava/api/Joinpoints.js";
 
-export default class SwitchToIf {
+export class SwitchToIf {
     constructor() { }
 
     public convert(sw: Switch): boolean {

@@ -1,6 +1,6 @@
 import { BinaryOp, IntLiteral, Loop, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 
-export default class LoopCharacterizer {
+export class LoopCharacterizer {
     constructor() { }
 
     public characterize(loop: Loop): LoopCharacterization {

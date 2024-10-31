@@ -30,7 +30,8 @@
     "./Voidifier": "./dist/src/Voidifier.js"
   },
   "dependencies": {
-    "@specs-feup/clava": "^3.0.1"
+    "@specs-feup/clava": "^3.0.1",
+    "@specs-feup/lara": "^3.0.2"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

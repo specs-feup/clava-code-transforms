@@ -2,7 +2,7 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { BinaryOp, Call, FunctionJp, Joinpoint, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 
-export default class StructDecomposer {
+export class StructDecomposer {
     silent;
 
     constructor(silent = false) {
