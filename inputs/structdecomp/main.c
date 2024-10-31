@@ -131,20 +131,24 @@ int main()
     // Clean up and free allocated memory
     free(myData.name);
 
-    // different initializations
+    // Direct list assigments
     Data dataInit1 = {102, 98.9, "Sample Data 1"};
     Data dataInit2 = {.id = 103, .value = 97.9, .name = "Sample Data 2"};
     Data dataInit3 = {.value = 96.9, .id = 104, .name = "Sample Data 3"};
     Data dataInit4 = {5};
-    int aSillyInteger = 6;
     Data dataInit5 = {.id = 105};
+
+    // Pointer assignments
     Data *dataInit6 = &(Data){106, 95.9, "Sample Data 6"};
     Data *dataInit7 = &(Data){.id = 107, .value = 94.9, .name = "Sample Data 7"};
     Data *dataInit8 = &(Data){.value = 93.9, .id = 108, .name = "Sample Data 8"};
     Data *dataInit9 = &(Data){109};
     Data *dataInit10 = &(Data){.id = 110};
-    Data *dataInit11 = (Data *)malloc(sizeof(Data));
-    *dataInit11 = (Data){111, 92.9, "Sample Data 11"};
+    Data *dataInit11 = &(Data){111, 92.9, "Sample Data 11"};
+
+    // Malloc assignment
+    Data *dataInit12 = (Data *)malloc(sizeof(Data));
+    Data *dataInit13 = malloc(sizeof(Data));
 
     foo();
 

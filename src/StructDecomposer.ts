@@ -175,13 +175,11 @@ export class StructDecomposer {
         let initVars: [string, Vardecl][] = [];
 
         const decomposers: StructInitDecomposer[] = [
-            new DirectListAssignment()
+            new DirectListAssignment(),
+            new PointerListAssignment()
         ];
         for (const decomposer of decomposers) {
-            if (!decomposer.validate(decl, struct)) {
-                continue;
-            }
-            else {
+            if (decomposer.validate(decl)) {
                 return decomposer.decompose(decl, struct);
             }
         }
@@ -395,7 +393,7 @@ export class StructDecomposer {
 }
 
 interface StructInitDecomposer {
-    validate(decl: Vardecl, struct: Struct): boolean;
+    validate(decl: Vardecl): boolean;
     decompose(decl: Vardecl, struct: Struct): [string, Vardecl][];
 }
 
@@ -415,12 +413,13 @@ interface StructInitDecomposer {
  * Data dataInit5 = {.id = 105}
  */
 class DirectListAssignment implements StructInitDecomposer {
-    validate(decl: Vardecl, struct: Struct): boolean {
+    validate(decl: Vardecl): boolean {
         const cond1 = decl.children.length === 1;
         if (!cond1) {
             return false;
         }
-        if (!(decl.children[0] instanceof InitList)) {
+        const cond2 = decl.children[0] instanceof InitList;
+        if (!cond2) {
             return false;
         }
         return true;
@@ -431,6 +430,7 @@ class DirectListAssignment implements StructInitDecomposer {
 
         const initList = decl.children[0] as InitList;
         const fields = struct.fields;
+
         for (let i = 0; i < fields.length; i++) {
             const field = fields[i];
             const fieldName = field.name;
@@ -446,7 +446,73 @@ class DirectListAssignment implements StructInitDecomposer {
                 newVars.push([fieldName, newVar]);
             }
             else {
-                console.log(`[DirectListAssignment] Unknown initialized of type ${fieldInit.joinPointType}`);
+                console.log(`[DirectListAssignment] Unknown init of type ${fieldInit.joinPointType}`);
+                const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, field.type);
+                newVars.push([fieldName, newVar]);
+            }
+        }
+
+        return newVars;
+    }
+}
+
+/**
+ * Decomposes struct initializations that are done by assigning a list to a pointer,
+ * of AST structure like:
+ * >vardecl
+ * ->unaryOp  {kind: addr_of}
+ * -->literal
+ * --->initList
+ * ---->intLiteral
+ * ---->implicitValue
+ * ---->implicitValue
+ * Examples:
+ * Data *dataInit6 = &(Data){106, 95.9, "Sample Data 6"}
+ * Data *dataInit7 = &(Data){.id = 107, .value = 94.9, .name = "Sample Data 7"}
+ * Data *dataInit8 = &(Data){.value = 93.9, .id = 108, .name = "Sample Data 8"}
+ * Data *dataInit9 = &(Data){109}
+ * Data *dataInit10 = &(Data){.id = 110}
+ */
+class PointerListAssignment implements StructInitDecomposer {
+    validate(decl: Vardecl): boolean {
+        const cond1 = decl.children.length === 1;
+        const cond2 = decl.children[0] instanceof UnaryOp && decl.children[0].kind === "addr_of";
+        const cond3 = decl.children[0].children[0] instanceof Literal;
+        const cond4 = decl.children[0].children[0].children[0] instanceof InitList;
+        if (!(cond1 && cond2 && cond3 && cond4)) {
+            return false;
+        }
+        return true;
+    }
+
+    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+        const newVars: [string, Vardecl][] = [];
+
+        const initList = decl.children[0].children[0].children[0] as InitList;
+        const fields = struct.fields;
+
+        for (let i = 0; i < fields.length; i++) {
+            const field = fields[i];
+            const fieldName = field.name;
+            const fieldInit = initList.children[i];
+            const newVarName = `${decl.name}_${fieldName}`;
+            const pointerType = ClavaJoinPoints.pointer(field.type);
+
+            if (fieldInit instanceof ImplicitValue) {
+                const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, pointerType);
+                newVars.push([fieldName, newVar]);
+            }
+            else if (fieldInit instanceof Literal) {
+                const initValName = `${newVarName}_init`;
+                const initVal = ClavaJoinPoints.varDecl(initValName, fieldInit.copy());
+                const addrOfInitVal = ClavaJoinPoints.unaryOp("&", initVal.varref());
+                decl.insertBefore(initVal);
+
+                const newVar = ClavaJoinPoints.varDecl(newVarName, addrOfInitVal);
+                newVars.push([fieldName, newVar]);
+            }
+            else {
+                console.log(`[DirectListAssignment] Unknown init of type ${fieldInit.joinPointType}`);
                 const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, field.type);
                 newVars.push([fieldName, newVar]);
             }
