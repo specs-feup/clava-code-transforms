@@ -1,5 +1,6 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { Call, Cast, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, Cast, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import Query from "@specs-feup/lara/api/weaver/Query.js";
 
 export interface StructAssignmentDecomposer {
     validate(decl: Vardecl): boolean;
@@ -84,11 +85,15 @@ export class DirectListAssignment implements StructAssignmentDecomposer {
  */
 export class PointerListAssignment implements StructAssignmentDecomposer {
     validate(decl: Vardecl): boolean {
-        const cond1 = decl.children.length === 1;
-        const cond2 = decl.children[0] instanceof UnaryOp && decl.children[0].kind === "addr_of";
-        const cond3 = decl.children[0].children[0] instanceof Literal;
-        const cond4 = decl.children[0].children[0].children[0] instanceof InitList;
-        if (!(cond1 && cond2 && cond3 && cond4)) {
+        try {
+            const cond1 = decl.children.length === 1;
+            const cond2 = decl.children[0] instanceof UnaryOp && decl.children[0].kind === "addr_of";
+            const cond3 = decl.children[0].children[0] instanceof Literal;
+            const cond4 = decl.children[0].children[0].children[0] instanceof InitList;
+            if (!(cond1 && cond2 && cond3 && cond4)) {
+                return false;
+            }
+        } catch (e) {
             return false;
         }
         return true;
@@ -212,6 +217,72 @@ export class MallocAssignment implements StructAssignmentDecomposer {
 
             const newVar = ClavaJoinPoints.varDecl(newVarName, cast);
             newVars.push([fieldName, newVar]);
+        }
+
+        return newVars;
+    }
+}
+
+export class StructToStructAssignment implements StructAssignmentDecomposer {
+    validate(decl: Vardecl): boolean {
+        if (decl.children.length !== 1) {
+            return false;
+        }
+        const varref = Query.searchFrom(decl, Varref).first();
+        if (varref == undefined) {
+            return false;
+        }
+        const declBaseType = decl.type.code.replace("*", "").replace("struct ", "").trim();
+        const varrefBaseType = varref.type.code.replace("*", "").replace("struct ", "").trim();
+
+        return declBaseType === varrefBaseType;
+    }
+
+    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+        const newVars: [string, Vardecl][] = [];
+
+        const declName = decl.name;
+        const fields = struct.fields;
+        const rhsVarref = Query.searchFrom(decl, Varref).first()!;
+
+        const rhsIsDeref = rhsVarref.parent instanceof UnaryOp && rhsVarref.parent.kind === "deref";
+        const rhsIsAddrOf = rhsVarref.parent instanceof UnaryOp && rhsVarref.parent.kind === "addr_of";
+        const rhsIsPointer = rhsVarref.type.isPointer;
+        const lhsIsPointer = decl.type.isPointer;
+
+        for (const field of fields) {
+            const fieldName = field.name;
+            const lhsVarName = `${declName}_${fieldName}`;
+            const rhsVarName = `${rhsVarref.name}_${fieldName}`;
+
+            if (!lhsIsPointer && !rhsIsPointer) {
+                const dummyRhs = ClavaJoinPoints.varRef(rhsVarName, field.type);
+                const newLhs = ClavaJoinPoints.varDecl(lhsVarName, dummyRhs);
+
+                newVars.push([fieldName, newLhs]);
+            }
+            else if (!lhsIsPointer && rhsIsPointer && rhsIsDeref) {
+                const pointerType = ClavaJoinPoints.pointer(field.type);
+                const dummyRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
+                const derefRhs = ClavaJoinPoints.unaryOp("*", dummyRhs);
+                const newLhs = ClavaJoinPoints.varDecl(lhsVarName, derefRhs);
+
+                newVars.push([fieldName, newLhs]);
+            }
+            else if (lhsIsPointer && rhsIsPointer) {
+                const pointerType = ClavaJoinPoints.pointer(field.type);
+                const dummyRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
+                const newLhs = ClavaJoinPoints.varDecl(lhsVarName, dummyRhs);
+
+                newVars.push([fieldName, newLhs]);
+            }
+            else if (lhsIsPointer && !rhsIsPointer && rhsIsAddrOf) {
+                const dummyRhs = ClavaJoinPoints.varRef(rhsVarName, field.type);
+                const addrOfRhs = ClavaJoinPoints.unaryOp("&", dummyRhs);
+                const newLhs = ClavaJoinPoints.varDecl(lhsVarName, addrOfRhs);
+
+                newVars.push([fieldName, newLhs]);
+            }
         }
 
         return newVars;

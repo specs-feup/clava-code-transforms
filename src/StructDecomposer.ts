@@ -2,7 +2,7 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { BinaryOp, Call, Expression, FunctionJp, Joinpoint, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { AstDumper } from "../test/AstDumper.js";
-import { DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer } from "./StructAssignmentDecomp.js";
+import { DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
 
 export class StructDecomposer {
     private silent;
@@ -157,7 +157,8 @@ export class StructDecomposer {
         const decomposers: StructAssignmentDecomposer[] = [
             new DirectListAssignment(),
             new PointerListAssignment(),
-            new MallocAssignment()
+            new MallocAssignment(),
+            new StructToStructAssignment()
         ];
         for (const decomposer of decomposers) {
             if (decomposer.validate(decl)) {
@@ -165,9 +166,7 @@ export class StructDecomposer {
             }
         }
 
-        this.log("Could not decompose init: " + decl.code + "\n");
-        const ast = new AstDumper().dump(decl);
-        console.log(ast);
+        this.log("Could not decompose init: " + decl.code);
         return initVars;
     }
 
@@ -198,7 +197,6 @@ export class StructDecomposer {
         const fieldAccess = ref.parent as MemberAccess;
         const fieldName = fieldAccess.name;
 
-        console.log("fieldAccess: " + fieldAccess.code);
         const nameAndVardecl = fieldDecls.find(([name, _]) => name === fieldName)!;
         const newVar = nameAndVardecl[1];
         const newRef = ClavaJoinPoints.varRef(newVar);
@@ -223,7 +221,7 @@ export class StructDecomposer {
     }
 
     private replaceRefByAllFields(ref: Varref, fieldDecls: [string, Vardecl][]): void {
-        // TODO
+        console.log("Here! " + ref.code);
     }
 
     private replaceRefArg(ref: Varref, fieldDecls: [string, Vardecl][]): void {

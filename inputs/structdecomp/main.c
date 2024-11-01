@@ -102,16 +102,23 @@ void testEverything(Data s1, Data *s2)
     // S3
     s2->id = s3.id;
     // S4
-    s1 = s3;
-    // S5
     Data *s4 = &(Data){106, 95.9, "bar"};
-    // S6
+    // S5
     s2->name = s4->name;
-    // S7
+    // S6
     testCopyStruct(s3);
     testCopyStruct(*s4);
     testPointerStruct(s4);
     testPointerStruct(&s3);
+
+    // S7
+    Data s5 = s3;
+    // S8
+    Data s6 = *s4;
+    // S9
+    Data *s7 = s4;
+    // S10
+    Data *s8 = &s3;
 }
 /*
 void declsWithInit()
