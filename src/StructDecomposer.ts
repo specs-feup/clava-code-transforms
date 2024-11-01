@@ -558,8 +558,7 @@ class MallocAssignment implements StructAssignmentDecomposer {
 
             const lastArg = possibleCall.args[possibleCall.args.length - 1];
             if (lastArg instanceof UnaryExprOrType) {
-                console.log(lastArg.kind);
-                console.log(lastArg.argType.code);
+
                 const isSizeof = lastArg.kind === "sizeof";
                 if (!isSizeof) {
                     return false;
@@ -598,10 +597,9 @@ class MallocAssignment implements StructAssignmentDecomposer {
             const fieldName = fields[i].name;
             const newVarName = `${decl.name}_${fieldName}`;
 
-            const size = this.getDatatypeSize(type);
-            const sizeArg = ClavaJoinPoints.integerLiteral(size);
+            const sizeofArg = ClavaJoinPoints.exprLiteral(`sizeof(${type.code})`);
 
-            const call = ClavaJoinPoints.callFromName("malloc", ClavaJoinPoints.type("void*"), sizeArg);
+            const call = ClavaJoinPoints.callFromName("malloc", ClavaJoinPoints.type("void*"), sizeofArg);
             const cast = ClavaJoinPoints.cStyleCast(pointerType, call);
 
             const newVar = ClavaJoinPoints.varDecl(newVarName, cast);
@@ -609,10 +607,5 @@ class MallocAssignment implements StructAssignmentDecomposer {
         }
 
         return newVars;
-    }
-
-    private getDatatypeSize(type: Type): number {
-
-        return 4;
     }
 }
