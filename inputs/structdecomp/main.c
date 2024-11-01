@@ -21,7 +21,7 @@ typedef struct
     float value; // Scalar member: float
     char *name;  // Pointer member: char*
 } Data;
-/*
+
 Point3D globalPoint3D;
 
 void usePoint2D(struct Point2D point)
@@ -83,7 +83,6 @@ void structToStructAssignment()
     Data d2;
     d2 = d1;
 }
-*/
 
 void testCopyStruct(Data s)
 {
@@ -119,8 +118,20 @@ void testEverything(Data s1, Data *s2)
     Data *s7 = s4;
     // S10
     Data *s8 = &s3;
+
+    // S11
+    s3 = s5;
+
+    // S12
+    s6 = *s4;
+
+    // S13
+    s7 = s4;
+
+    // S14
+    s8 = &s3;
 }
-/*
+
 void declsWithInit()
 {
     // Direct list assigments
@@ -196,4 +207,3 @@ int main()
 
     return 0;
 }
-*/

@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, Call, Expression, FunctionJp, Joinpoint, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { BinaryOp, Call, Expression, ExprStmt, FunctionJp, Joinpoint, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { AstDumper } from "../test/AstDumper.js";
 import { DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
 
@@ -110,10 +110,14 @@ export class StructDecomposer {
             return [];
         }
 
+        const refs: Varref[] = [];
         for (const varref of Query.searchFrom(scope, Varref)) {
             if (varref.name === decl.name) {
-                this.replaceRef(varref, fieldDecls);
+                refs.push(varref);
             }
+        }
+        for (const varref of refs) {
+            this.replaceRef(varref, fieldDecls);
         }
         return fieldDecls;
     }
@@ -180,7 +184,11 @@ export class StructDecomposer {
             const binaryOp = ref.getAncestor("binaryOp") as BinaryOp;
 
             if (binaryOp.kind === "assign") {
-                this.replaceRefByAllFields(ref, fieldDecls);
+                const leftRef = Query.searchFromInclusive(binaryOp.left, Varref).first() as Varref;
+                const rightRef = Query.searchFromInclusive(binaryOp.right, Varref).first() as Varref;
+
+                this.replaceRefByAllFields(leftRef, rightRef, fieldDecls);
+                binaryOp.parent.detach();
             }
         }
         // Struct passed as argument to a function, e.g., doSomething(bar)
@@ -220,8 +228,59 @@ export class StructDecomposer {
         }
     }
 
-    private replaceRefByAllFields(ref: Varref, fieldDecls: [string, Vardecl][]): void {
-        console.log("Here! " + ref.code);
+    private replaceRefByAllFields(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][]): void {
+        const rhsIsDeref = rightRef.parent instanceof UnaryOp && rightRef.parent.kind === "deref";
+        const rhsIsAddrOf = rightRef.parent instanceof UnaryOp && rightRef.parent.kind === "addr_of";
+        const rhsIsPointer = rightRef.type.isPointer;
+        const lhsIsPointer = leftRef.type.isPointer;
+
+        const newExprs: ExprStmt[] = [];
+
+        for (const [fieldName, fieldDecl] of fieldDecls) {
+            const lhsVarName = `${leftRef.name}_${fieldName}`;
+            const rhsVarName = `${rightRef.name}_${fieldName}`;
+
+            if (!lhsIsPointer && !rhsIsPointer) {
+                const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+                const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
+                const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
+                const stmt = ClavaJoinPoints.exprStmt(assign);
+
+                newExprs.push(stmt);
+            }
+            else if (!lhsIsPointer && rhsIsPointer && rhsIsDeref) {
+                const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+                const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
+                const newRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
+                const deref = ClavaJoinPoints.unaryOp("*", newRhs);
+                const assign = ClavaJoinPoints.binaryOp("=", newLhs, deref);
+                const stmt = ClavaJoinPoints.exprStmt(assign);
+
+                newExprs.push(stmt);
+            }
+            else if (lhsIsPointer && rhsIsPointer) {
+                const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
+                const newRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
+                const newLhs = ClavaJoinPoints.varRef(lhsVarName, pointerType);
+                const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
+                const stmt = ClavaJoinPoints.exprStmt(assign);
+
+                newExprs.push(stmt);
+            }
+            else if (lhsIsPointer && !rhsIsPointer && rhsIsAddrOf) {
+                const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
+                const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
+                const addrOf = ClavaJoinPoints.unaryOp("&", newRhs);
+                const newLhs = ClavaJoinPoints.varRef(lhsVarName, pointerType);
+                const assign = ClavaJoinPoints.binaryOp("=", newLhs, addrOf);
+                const stmt = ClavaJoinPoints.exprStmt(assign);
+
+                newExprs.push(stmt);
+            }
+        }
+        for (const expr of newExprs) {
+            leftRef.parent.insertAfter(expr);
+        }
     }
 
     private replaceRefArg(ref: Varref, fieldDecls: [string, Vardecl][]): void {
