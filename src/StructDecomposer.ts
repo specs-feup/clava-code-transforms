@@ -119,6 +119,7 @@ export class StructDecomposer {
         for (const varref of refs) {
             this.replaceRef(varref, fieldDecls);
         }
+        decl.getAncestor("declStmt").detach();
         return fieldDecls;
     }
 
