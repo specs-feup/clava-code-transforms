@@ -21,7 +21,7 @@ typedef struct
     float value; // Scalar member: float
     char *name;  // Pointer member: char*
 } Data;
-
+/*
 Point3D globalPoint3D;
 
 void usePoint2D(struct Point2D point)
@@ -77,11 +77,65 @@ void useDataRef(Data *data)
     printf("Data + 1: ID=%d, Value=%.2f\n", id1, value1);
 }
 
-void foo()
+void structToStructAssignment()
 {
     Data d1 = {1, 2.0, "Data 1"};
     Data d2;
     d2 = d1;
+}
+*/
+
+void testCopyStruct(Data s)
+{
+}
+
+void testPointerStruct(Data *s)
+{
+}
+
+void testEverything(Data s1, Data *s2)
+{
+    // S1
+    Data s3 = {102, 98.9, "foo"};
+    // S2
+    s3.id = 999;
+    // S3
+    s2->id = s3.id;
+    // S4
+    s1 = s3;
+    // S5
+    Data *s4 = &(Data){106, 95.9, "bar"};
+    // S6
+    s2->name = s4->name;
+    // S7
+    testCopyStruct(s3);
+    testCopyStruct(*s4);
+    testPointerStruct(s4);
+    testPointerStruct(&s3);
+}
+/*
+void declsWithInit()
+{
+    // Direct list assigments
+    Data dataInit1 = {102, 98.9, "Sample Data 1"};
+    Data dataInit2 = {.id = 103, .value = 97.9, .name = "Sample Data 2"};
+    Data dataInit3 = {.value = 96.9, .id = 104, .name = "Sample Data 3"};
+    Data dataInit4 = {5};
+    Data dataInit5 = {.id = 105};
+
+    // Pointer assignments
+    Data *dataInit6 = &(Data){106, 95.9, "Sample Data 6"};
+    Data *dataInit7 = &(Data){.id = 107, .value = 94.9, .name = "Sample Data 7"};
+    Data *dataInit8 = &(Data){.value = 93.9, .id = 108, .name = "Sample Data 8"};
+    Data *dataInit9 = &(Data){109};
+    Data *dataInit10 = &(Data){.id = 110};
+    Data *dataInit11 = &(Data){111, 92.9, "Sample Data 11"};
+
+    // Malloc assignment
+    Data *dataInit12 = malloc(sizeof(Data));
+    Data *dataInit13 = (Data *)malloc(sizeof(Data));
+    Data *dataInit14 = (Data *)malloc(16);
+    Data *dataInit15 = (Data *)calloc(1, sizeof(Data));
 }
 
 int main()
@@ -131,27 +185,8 @@ int main()
     // Clean up and free allocated memory
     free(myData.name);
 
-    // Direct list assigments
-    Data dataInit1 = {102, 98.9, "Sample Data 1"};
-    Data dataInit2 = {.id = 103, .value = 97.9, .name = "Sample Data 2"};
-    Data dataInit3 = {.value = 96.9, .id = 104, .name = "Sample Data 3"};
-    Data dataInit4 = {5};
-    Data dataInit5 = {.id = 105};
-
-    // Pointer assignments
-    Data *dataInit6 = &(Data){106, 95.9, "Sample Data 6"};
-    Data *dataInit7 = &(Data){.id = 107, .value = 94.9, .name = "Sample Data 7"};
-    Data *dataInit8 = &(Data){.value = 93.9, .id = 108, .name = "Sample Data 8"};
-    Data *dataInit9 = &(Data){109};
-    Data *dataInit10 = &(Data){.id = 110};
-    Data *dataInit11 = &(Data){111, 92.9, "Sample Data 11"};
-
-    // Malloc assignment
-    Data *dataInit12 = malloc(sizeof(Data));
-    Data *dataInit13 = (Data *)malloc(sizeof(Data));
-    Data *dataInit14 = (Data *)malloc(16);
-    Data *dataInit15 = (Data *)calloc(1, sizeof(Data));
     foo();
 
     return 0;
 }
+*/

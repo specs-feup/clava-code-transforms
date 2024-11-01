@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, Call, Cast, FloatLiteral, FunctionJp, ImplicitValue, InitList, IntLiteral, Joinpoint, Literal, MemberAccess, Param, Struct, Type, TypedefDecl, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { BinaryOp, Call, Cast, Expression, FloatLiteral, FunctionJp, ImplicitValue, InitList, IntLiteral, Joinpoint, Literal, MemberAccess, Param, Struct, Type, TypedefDecl, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { AstDumper } from "../test/AstDumper.js";
 
 export class StructDecomposer {
@@ -22,7 +22,7 @@ export class StructDecomposer {
         const decompNames = [];
         for (const structName in structs) {
             const struct = structs[structName];
-            this.decompose(struct, structName);
+            this.decomposeNew(struct, structName);
             this.log("------------------------------");
             decompNames.push(structName);
         }
@@ -39,7 +39,7 @@ export class StructDecomposer {
                 const structName = this.getStructName(struct);
 
                 if (structName === name) {
-                    this.decompose(struct, name);
+                    this.decomposeNew(struct, name);
                     this.log("------------------------------");
                     decompNames.push(name);
                 }
@@ -48,25 +48,14 @@ export class StructDecomposer {
         return decompNames;
     }
 
-    public decompose(struct: Struct, name: string): void {
+    public decomposeNew(struct: Struct, name: string): void {
         this.log(`Decomposing struct "${name}"`);
 
         const decls = this.getAllDeclsOfStruct(name);
         this.log(`Found ${decls.length} declarations for struct "${name}"`);
 
-        const params = this.getAllParamsOfStruct(name);
-        this.log(`Found ${params.length} parameters for struct "${name}"`);
-
-        for (const param of params) {
-            this.decomposeParam(param, struct);
-        }
-
         for (const decl of decls) {
-            this.decomposeDecl(decl, struct);
-        }
-
-        for (const param of params) {
-            this.removeStructParam(param);
+            this.decomposeDeclAndRefs(decl, struct);
         }
     }
 
@@ -103,48 +92,51 @@ export class StructDecomposer {
         return decls;
     }
 
-    private getAllParamsOfStruct(name: string): Param[] {
-        const params = [];
+    private decomposeDeclAndRefs(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+        // First, decompose the declaration
+        const fieldDecls = this.decomposeDecl(decl, struct);
 
-        for (const decl of Query.search(Param)) {
-            const type = decl.type;
-            const typeName = type.code.replace("*", "").replace("struct ", "").trim();
-            const parentFun = decl.getAncestor("function") as FunctionJp;
-            const hasParentFunction = parentFun != undefined && parentFun.isImplementation;
+        // Then, get the decl's scope to then find all references to the decl
+        const scope = decl.getAncestor("scope")!;
+        if (scope == null) {
+            console.log("No scope found for decl: " + decl.name);
+            return [];
+        }
 
-            if (typeName === name && decl.isParam && hasParentFunction) {
-                //println(`decl: ${decl.name}, kind: ${type.kind}, type: "${typeName}"`);
-                params.push(decl);
+        for (const varref of Query.searchFrom(scope, Varref)) {
+            if (varref.name === decl.name) {
+
+                // If the varref is a member access, replace it with a ref to the field decl
+                if (varref.parent instanceof MemberAccess) {
+                    this.replaceRefByField(varref, fieldDecls);
+                }
+                // Struct-to-struct assignment, e.g., foo = bar
+                else if (varref.getAncestor("binaryOp") != null) {
+                    const binaryOp = varref.getAncestor("binaryOp") as BinaryOp;
+
+                    if (binaryOp.kind === "assign") {
+                        this.replaceRefByAllFields(varref, fieldDecls);
+                    }
+                }
+                // Struct passed as argument to a function, e.g., doSomething(bar)
+                else if (varref.isFunctionArgument) {
+                    this.replaceRefArg(varref, fieldDecls);
+                }
             }
         }
-        return params;
+        return fieldDecls;
     }
 
     private decomposeDecl(decl: Vardecl, struct: Struct): [string, Vardecl][] {
-        // Find all struct decls (local and global), and create vars for each field
         const newVars: [string, Vardecl][] = decl.hasInit ?
             this.createNewVarsWithInit(decl, struct) :
             this.createNewVarsNoInit(decl, struct);
 
-        for (const [fieldName, newVar] of newVars.reverse()) {
+        for (const [_, newVar] of newVars.reverse()) {
             decl.insertAfter(newVar);
         }
 
-        // Replace all references to the struct fields with the new vars
-        this.replaceFieldRefs(decl, newVars);
-
-        // Replace all references to the struct itself in function calls
-        this.replaceRefsInCalls(decl, newVars);
-
         return newVars;
-    }
-
-    private decomposeParam(param: Param, struct: Struct): void {
-        // Find all struct params, and create params for each field
-        const newParams = this.createNewParams(param, struct);
-
-        // Replace all references to the struct fields with the new params
-        this.replaceFieldRefs(param, newParams);
     }
 
     private createNewVarsNoInit(decl: Vardecl, struct: Struct): [string, Vardecl][] {
@@ -188,6 +180,104 @@ export class StructDecomposer {
         return initVars;
     }
 
+    private replaceRefByField(ref: Varref, fieldDecls: [string, Vardecl][]): void {
+        const fieldAccess = ref.parent as MemberAccess;
+        const fieldName = fieldAccess.name;
+
+        const nameAndVardecl = fieldDecls.find(([name, varDecl]) => name === fieldName)!;
+        const newVar = nameAndVardecl[1];
+        const newRef = ClavaJoinPoints.varRef(newVar);
+
+        // foo.bar
+        if (!fieldAccess.arrow) {
+            fieldAccess.replaceWith(newRef);
+        }
+        else {
+            const derefRef = ClavaJoinPoints.unaryOp("*", newRef);
+
+            // a + foo->bar
+            if (fieldAccess.parent instanceof BinaryOp && fieldAccess.parent.rightJp == fieldAccess) {
+                const parenthesis = ClavaJoinPoints.parenthesis(derefRef);
+                fieldAccess.replaceWith(parenthesis);
+            }
+            // foo->bar
+            else {
+                fieldAccess.replaceWith(derefRef);
+            }
+        }
+    }
+
+    private replaceRefByAllFields(ref: Varref, fieldDecls: [string, Vardecl][]): void {
+        // TODO
+    }
+
+    private replaceRefArg(ref: Varref, fieldDecls: [string, Vardecl][]): void {
+        const call = ref.getAncestor("call") as Call;
+        const newArgs = [];
+
+        for (let i = 0; i < call.args.length; i++) {
+            const arg = call.args[i] as Expression;
+
+            // doSomething(Data bar) -> Data bar; doSomething(bar)
+            if (arg instanceof Varref && arg.name === ref.name) {
+                for (const [_, newVar] of fieldDecls) {
+                    const newArg = ClavaJoinPoints.varRef(newVar);
+                    newArgs.push(newArg);
+                }
+            }
+            // doSomething(Data bar) -> Data *bar; doSomething(*bar)
+            else if (arg instanceof UnaryOp && arg.kind === "deref" && arg.children[0] instanceof Varref) {
+                for (const [_, newVar] of fieldDecls) {
+                    const newRef = ClavaJoinPoints.varRef(newVar);
+                    const newArg = ClavaJoinPoints.unaryOp("*", newRef);
+                    newArgs.push(newArg);
+                }
+            }
+            // doSomething(Data *bar) -> Data bar; doSomething(&bar)
+            else if (arg instanceof UnaryOp && arg.kind === "addr_of" && arg.children[0] instanceof Varref) {
+                for (const [_, newVar] of fieldDecls) {
+                    const newRef = ClavaJoinPoints.varRef(newVar);
+                    const newArg = ClavaJoinPoints.unaryOp("&", newRef);
+                    newArgs.push(newArg);
+                }
+            }
+            else {
+                newArgs.push(arg);
+            }
+        }
+        const newCall = ClavaJoinPoints.call(call.function, ...newArgs);
+        call.replaceWith(newCall);
+    }
+
+    //--------------------------------------------------------------------------------
+
+    private getAllParamsOfStruct(name: string): Param[] {
+        const params = [];
+
+        for (const decl of Query.search(Param)) {
+            const type = decl.type;
+            const typeName = type.code.replace("*", "").replace("struct ", "").trim();
+            const parentFun = decl.getAncestor("function") as FunctionJp;
+            const hasParentFunction = parentFun != undefined && parentFun.isImplementation;
+
+            if (typeName === name && decl.isParam && hasParentFunction) {
+                //println(`decl: ${decl.name}, kind: ${type.kind}, type: "${typeName}"`);
+                params.push(decl);
+            }
+        }
+        return params;
+    }
+
+    private decomposeParam(param: Param, struct: Struct): void {
+        // Find all struct params, and create params for each field
+        const newParams = this.createNewParams(param, struct);
+
+        // Replace all references to the struct fields with the new params
+        //this.replaceFieldRefs(param, newParams);
+    }
+
+
+
     private createNewParams(param: Param, struct: Struct): [string, Param][] {
         const newParams: [string, Param][] = [];
         const paramsOrdered = [];
@@ -230,53 +320,6 @@ export class StructDecomposer {
         fun.setParams(finalParams);
 
         return newParams;
-    }
-
-    private replaceFieldRefs(decl: Vardecl, newVars: [string, Vardecl][]): void {
-        const declName = decl.name;
-
-        let startingPoint;
-        if (decl.isGlobal) {
-            startingPoint = decl.root;
-        }
-        else if (decl.isParam) {
-            startingPoint = decl.parent;
-        }
-        else {
-            startingPoint = decl.currentRegion;
-        }
-
-        for (const ref of Query.searchFrom(startingPoint, Varref)) {
-            if (ref.name === declName && ref.parent instanceof MemberAccess) {
-                const fieldAccess = ref.parent as MemberAccess;
-                const fieldName = fieldAccess.name;
-
-                const nameAndVardecl = newVars.find(([name, varDecl]) => name === fieldName);
-                if (!nameAndVardecl) {
-                    continue;
-                }
-                const newVar = nameAndVardecl[1];
-                const newRef = ClavaJoinPoints.varRef(newVar);
-
-                // foo.bar
-                if (!fieldAccess.arrow) {
-                    fieldAccess.replaceWith(newRef);
-                }
-                else {
-                    const derefRef = ClavaJoinPoints.unaryOp("*", newRef);
-
-                    // a + foo->bar
-                    if (fieldAccess.parent instanceof BinaryOp && fieldAccess.parent.rightJp == fieldAccess) {
-                        const parenthesis = ClavaJoinPoints.parenthesis(derefRef);
-                        fieldAccess.replaceWith(parenthesis);
-                    }
-                    // foo->bar
-                    else {
-                        fieldAccess.replaceWith(derefRef);
-                    }
-                }
-            }
-        }
     }
 
     private replaceRefsInCalls(decl: Vardecl, newVars: [string, Vardecl][]): void {
@@ -336,7 +379,7 @@ export class StructDecomposer {
                 if (!argToReplace) {
                     continue;
                 }
-                const newArgs = this.makeNewArgs(argToReplace, newVars/*, decl*/);
+                const newArgs = this.makeNewArgs(argToReplace, newVars);
                 finalArgList.push(...newArgs);
             }
             else {
@@ -344,7 +387,6 @@ export class StructDecomposer {
             }
         }
 
-        //console.log(call.name + " -> " + finalArgList.length);
         const fun = call.function;
         const newCall = ClavaJoinPoints.call(fun, ...finalArgList);
         return newCall;
