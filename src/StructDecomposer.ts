@@ -1,7 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, Call, Expression, ExprStmt, FunctionJp, Joinpoint, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
-import { AstDumper } from "../test/AstDumper.js";
+import { BinaryOp, Call, DeclStmt, Expression, ExprStmt, FunctionJp, Joinpoint, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
 
 export class StructDecomposer {
@@ -30,26 +29,22 @@ export class StructDecomposer {
         return decompNames;
     }
 
-    public decomposeByName(nameOrNames: string | string[]): string[] {
-        const names = Array.isArray(nameOrNames) ? nameOrNames : [nameOrNames];
-        this.log(`Structs to decompose: ${names.join(", ")}`);
+    public decomposeByName(name: string | string[]): void {
+        for (const struct of Query.search(Struct)) {
+            const structName = this.getStructName(struct);
 
-        const decompNames = [];
-        for (const name of names) {
-            for (const struct of Query.search(Struct)) {
-                const structName = this.getStructName(struct);
-
-                if (structName === name) {
-                    this.decompose(struct, name);
-                    this.log("------------------------------");
-                    decompNames.push(name);
-                }
+            if (structName === name) {
+                this.decompose(struct, name);
             }
         }
-        return decompNames;
     }
 
-    public decompose(struct: Struct, name: string): void {
+    public decomposeByType(struct: Struct): void {
+        const name = this.getStructName(struct);
+        this.decompose(struct, name);
+    }
+
+    private decompose(struct: Struct, name: string): void {
         this.log(`Decomposing struct "${name}"`);
 
         const decls = this.getAllDeclsOfStruct(name);
@@ -73,7 +68,7 @@ export class StructDecomposer {
         }
     }
 
-    private getStructName(struct: Struct): string {
+    public getStructName(struct: Struct): string {
         let name: string = struct.name;
 
         // typedef struct { ... } typedef_name;
@@ -100,18 +95,16 @@ export class StructDecomposer {
     }
 
     private decomposeDeclAndRefs(decl: Vardecl, struct: Struct): [string, Vardecl][] {
-        // First, decompose the declaration
+        // First, decompose the decl
         const fieldDecls = this.decomposeDecl(decl, struct);
 
-        // Then, get the decl's scope to then find all references to the decl
-        const scope = decl.getAncestor("scope")!;
-        if (scope == null) {
-            console.log("No scope found for decl: " + decl.name);
-            return [];
-        }
-
+        // Then, find all references to the decl and replace them
+        // local decl: the parent scope
+        // global decl: the entire program (though there may be naming conflicts)
+        const startJp = decl.isGlobal ? decl.root : decl.getAncestor("scope")!;
         const refs: Varref[] = [];
-        for (const varref of Query.searchFrom(scope, Varref)) {
+
+        for (const varref of Query.searchFrom(startJp, Varref)) {
             if (varref.name === decl.name) {
                 refs.push(varref);
             }
@@ -119,6 +112,7 @@ export class StructDecomposer {
         for (const varref of refs) {
             this.replaceRef(varref, fieldDecls);
         }
+
         decl.getAncestor("declStmt").detach();
         return fieldDecls;
     }
@@ -129,7 +123,9 @@ export class StructDecomposer {
             this.createNewVarsNoInit(decl, struct);
 
         for (const [_, newVar] of newVars.reverse()) {
-            decl.insertAfter(newVar);
+            const parentStmt = decl.getAncestor("declStmt") as DeclStmt;
+            const wrappedDecl = ClavaJoinPoints.declStmt(newVar);
+            parentStmt.insertAfter(wrappedDecl);
         }
 
         return newVars;

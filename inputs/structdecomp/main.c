@@ -132,6 +132,15 @@ void testEverything(Data s1, Data *s2)
     s8 = &s3;
 }
 
+void createData(int id, float value, const char *name, Data *data)
+{
+    data = (Data *)malloc(sizeof(Data));
+    data->id = id;
+    data->value = value;
+    data->name = (char *)malloc(strlen(name) + 1);
+    strcpy(data->name, name);
+}
+
 void declsWithInit()
 {
     // Direct list assigments
@@ -204,6 +213,9 @@ int main()
     free(myData.name);
 
     foo();
+
+    Data *funData1;
+    createData(1, 2.0, "Data 1", funData1);
 
     return 0;
 }
