@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, Call, DeclStmt, Expression, ExprStmt, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 
@@ -10,55 +10,94 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     public decomposeAll(): string[] {
-        const structs: { [key: string]: Struct } = {};
+        const structs = this.findAllStructs();
+        this.log(`Found ${structs.length} regular structs`);
 
-        for (const struct of Query.search(Struct)) {
-            const name = this.getStructName(struct);
-            structs[name] = struct;
-        }
-        this.log(`Found ${Object.keys(structs).length} eligible structs`);
+        const classes = this.findAllStructlikeClasses();
+        this.log(`Found ${classes.length} structs aliased as classes`);
 
-        const decompNames = [];
-        for (const structName in structs) {
-            const struct = structs[structName];
-            this.decompose(struct, structName);
-            this.logLine();
-            decompNames.push(structName);
-        }
+        const decompNames: string[] = [];
+
+        structs.forEach(([name, struct]) => {
+            this.decompose(struct.fields, name);
+            decompNames.push(name);
+        });
+        classes.forEach(([name, classJp]) => {
+            this.decompose(classJp.fields, name);
+            decompNames.push(name);
+        });
+
         return decompNames;
     }
 
-    public decomposeByName(name: string | string[]): void {
+    public decomposeByName(name: string): void {
         for (const struct of Query.search(Struct)) {
             const structName = this.getStructName(struct);
 
             if (structName === name) {
-                this.decompose(struct, name);
+                this.decompose(struct.fields, name);
             }
         }
     }
 
-    public decomposeByType(struct: Struct): void {
+    public decomposeStruct(struct: Struct): void {
         const name = this.getStructName(struct);
-        this.decompose(struct, name);
+        this.decompose(struct.fields, name);
     }
 
-    private decompose(struct: Struct, name: string): void {
-        this.log(`Decomposing struct "${name}"`);
+    // -----------------------------------------------------------------------
+    private decompose(fields: Field[], name: string): void {
+        this.log(`Decomposing struct "${name}" with ${fields.length} field(s)`);
 
         const decls = this.getAllDeclsOfStruct(name);
         this.log(`Found ${decls.length} declarations for struct "${name}"`);
 
         for (const decl of decls) {
-            this.decomposeDeclAndRefs(decl, struct);
+            this.decomposeDeclAndRefs(decl, fields);
         }
 
         const params = this.getAllParamsOfStruct(name);
         this.log(`Found ${params.length} params for struct "${name}"`);
 
         for (const param of params) {
-            this.decomposeParam(param, struct);
+            this.decomposeParam(param, fields);
         }
+    }
+
+    private findAllStructs(): [string, Struct][] {
+        const structs: [string, Struct][] = [];
+
+        for (const struct of Query.search(Struct)) {
+            const name = this.getStructName(struct);
+            structs.push([name, struct]);
+        }
+        return structs;
+    }
+
+    private findAllStructlikeClasses(): [string, Class][] {
+        const classes: Map<string, Class> = new Map();
+
+        for (const file of Query.search(FileJp)) {
+            for (const stmt of file.children) {
+                if (stmt instanceof Class) {
+                    const classJp = stmt as Class;
+                    let name = classJp.name;
+
+                    let isStruct = false;
+                    for (const typedef of Query.searchFrom(classJp, TypedefDecl)) {
+                        if (typedef.type.code.trim() == "struct") {
+                            isStruct = true;
+                            name = typedef.name;
+                        }
+                    }
+
+                    if (isStruct) {
+                        classes.set(name, classJp);
+                    }
+                }
+            }
+        }
+        return Array.from(classes);
     }
 
     public getStructName(struct: Struct): string {
@@ -87,9 +126,9 @@ export class StructDecomposer extends AdvancedTransform {
         return decls;
     }
 
-    private decomposeDeclAndRefs(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+    private decomposeDeclAndRefs(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
         // First, decompose the decl
-        const fieldDecls = this.decomposeDecl(decl, struct);
+        const fieldDecls = this.decomposeDecl(decl, fields);
 
         // Then, find all references to the decl and replace them
         // local decl: the parent scope
@@ -110,10 +149,10 @@ export class StructDecomposer extends AdvancedTransform {
         return fieldDecls;
     }
 
-    private decomposeDecl(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+    private decomposeDecl(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
         const newVars: [string, Vardecl][] = decl.hasInit ?
-            this.createNewVarsWithInit(decl, struct) :
-            this.createNewVarsNoInit(decl, struct);
+            this.createNewVarsWithInit(decl, fields) :
+            this.createNewVarsNoInit(decl, fields);
 
         for (const [_, newVar] of newVars.reverse()) {
             const parentStmt = decl.getAncestor("declStmt") as DeclStmt;
@@ -124,11 +163,11 @@ export class StructDecomposer extends AdvancedTransform {
         return newVars;
     }
 
-    private createNewVarsNoInit(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+    private createNewVarsNoInit(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
         const newVars: [string, Vardecl][] = [];
         const declName = decl.name;
 
-        for (const field of struct.fields) {
+        for (const field of fields) {
             const fieldName = field.name;
             const newVarName = `${declName}_${fieldName}`;
 
@@ -144,7 +183,7 @@ export class StructDecomposer extends AdvancedTransform {
         return newVars;
     }
 
-    private createNewVarsWithInit(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+    private createNewVarsWithInit(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
 
         let initVars: [string, Vardecl][] = [];
 
@@ -156,7 +195,7 @@ export class StructDecomposer extends AdvancedTransform {
         ];
         for (const decomposer of decomposers) {
             if (decomposer.validate(decl)) {
-                return decomposer.decompose(decl, struct);
+                return decomposer.decompose(decl, fields);
             }
         }
 
@@ -339,11 +378,11 @@ export class StructDecomposer extends AdvancedTransform {
         return params;
     }
 
-    private decomposeParam(param: Param, struct: Struct): void {
+    private decomposeParam(param: Param, fields: Field[]): void {
         const fun = param.getAncestor("function") as FunctionJp;
         const scope = fun.body;
 
-        const fieldParams = this.replaceParamByFields(param, struct);
+        const fieldParams = this.replaceParamByFields(param, fields);
 
         for (const varref of Query.searchFrom(scope, Varref)) {
             if (varref.name === param.name) {
@@ -352,8 +391,8 @@ export class StructDecomposer extends AdvancedTransform {
         }
     }
 
-    private replaceParamByFields(param: Param, struct: Struct): [string, Param][] {
-        const newVars = this.createNewVarsNoInit(param, struct);
+    private replaceParamByFields(param: Param, fields: Field[]): [string, Param][] {
+        const newVars = this.createNewVarsNoInit(param, fields);
         const newParams: [string, Param][] = [];
 
         for (const [fieldName, newVar] of newVars) {

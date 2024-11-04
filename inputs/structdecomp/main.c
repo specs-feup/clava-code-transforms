@@ -22,6 +22,15 @@ typedef struct
     char *name;  // Pointer member: char*
 } Data;
 
+typedef float pixel_t;
+
+typedef struct
+{
+    pixel_t x;
+    pixel_t y;
+    pixel_t z;
+} gradient_t;
+
 Point3D globalPoint3D;
 
 void usePoint2D(struct Point2D point)

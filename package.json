@@ -15,6 +15,7 @@
     "test:outliner": "clava dist/test/TestOutliner.js -- clang inputs/outlining/",
     "test:outliner-edgecase": "clava dist/test/TestOutliner.js -- clang inputs/outlining/OutlineEdgecase.c",
     "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11",
+    "test:structdecomp-cpp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp-cpp/ -std c++11",
     "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/",
     "clean": "rm -rf node_modules package-lock.json dist/ woven_code/ output/"
   },

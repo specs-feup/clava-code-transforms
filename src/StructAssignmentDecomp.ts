@@ -1,10 +1,10 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { Call, Cast, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { Call, Cast, Field, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
 export interface StructAssignmentDecomposer {
     validate(decl: Vardecl): boolean;
-    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][];
+    decompose(decl: Vardecl, fields: Field[]): [string, Vardecl][];
 }
 
 /**
@@ -29,23 +29,20 @@ export class DirectListAssignment implements StructAssignmentDecomposer {
             return false;
         }
         const cond2 = decl.children[0] instanceof InitList;
-        if (!cond2) {
-            return false;
-        }
-        return true;
+        return cond2;
     }
 
-    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+    decompose(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
         const newVars: [string, Vardecl][] = [];
 
         const initList = decl.children[0] as InitList;
-        const fields = struct.fields;
 
         for (let i = 0; i < fields.length; i++) {
             const field = fields[i];
             const fieldName = field.name;
             const fieldInit = initList.children[i];
             const newVarName = `${decl.name}_${fieldName}`;
+            console.log(`[DirectListAssignment] Field ${fieldName} with init ${fieldInit}`);
 
             if (fieldInit instanceof ImplicitValue) {
                 const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, field.type);
@@ -56,7 +53,7 @@ export class DirectListAssignment implements StructAssignmentDecomposer {
                 newVars.push([fieldName, newVar]);
             }
             else {
-                console.log(`[DirectListAssignment] Unknown init of type ${fieldInit.joinPointType}`);
+                console.log(`[DirectListAssignment] Unknown init ${fieldInit}`);
                 const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, field.type);
                 newVars.push([fieldName, newVar]);
             }
@@ -99,11 +96,10 @@ export class PointerListAssignment implements StructAssignmentDecomposer {
         return true;
     }
 
-    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+    decompose(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
         const newVars: [string, Vardecl][] = [];
 
         const initList = decl.children[0].children[0].children[0] as InitList;
-        const fields = struct.fields;
 
         for (let i = 0; i < fields.length; i++) {
             const field = fields[i];
@@ -126,7 +122,7 @@ export class PointerListAssignment implements StructAssignmentDecomposer {
                 newVars.push([fieldName, newVar]);
             }
             else {
-                console.log(`[DirectListAssignment] Unknown init of type ${fieldInit.joinPointType}`);
+                console.log(`[DirectListAssignment] Unknown init ${fieldInit}`);
                 const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, field.type);
                 newVars.push([fieldName, newVar]);
             }
@@ -199,10 +195,8 @@ export class MallocAssignment implements StructAssignmentDecomposer {
         }
     }
 
-    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+    decompose(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
         const newVars: [string, Vardecl][] = [];
-
-        const fields = struct.fields;
 
         for (let i = 0; i < fields.length; i++) {
             const type = fields[i].type;
@@ -238,11 +232,10 @@ export class StructToStructAssignment implements StructAssignmentDecomposer {
         return declBaseType === varrefBaseType;
     }
 
-    decompose(decl: Vardecl, struct: Struct): [string, Vardecl][] {
+    decompose(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
         const newVars: [string, Vardecl][] = [];
 
         const declName = decl.name;
-        const fields = struct.fields;
         const rhsVarref = Query.searchFrom(decl, Varref).first()!;
 
         const rhsIsDeref = rhsVarref.parent instanceof UnaryOp && rhsVarref.parent.kind === "deref";
