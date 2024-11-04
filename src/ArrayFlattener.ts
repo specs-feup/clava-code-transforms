@@ -1,10 +1,12 @@
 import { FunctionJp, Param, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
+import { AdvancedTransform } from "./AdvancedTransform.js";
 
-
-export class ArrayFlattener {
-    constructor() { }
+export class ArrayFlattener extends AdvancedTransform {
+    constructor(silent: boolean = false) {
+        super("ArrayFlattener", silent);
+    }
 
     public flattenAllInFunction(fun: FunctionJp): number {
         for (const param of Query.searchFrom(fun, Param)) {
@@ -15,11 +17,11 @@ export class ArrayFlattener {
         return 0;
     }
 
-    public flattenParameterArray(fun: FunctionJp, arrayParam: Param): void {
+    private flattenParameterArray(fun: FunctionJp, arrayParam: Param): void {
 
     }
 
-    public flattenLocalArray(fun: FunctionJp, arrayVar: Varref): void {
+    private flattenLocalArray(fun: FunctionJp, arrayVar: Varref): void {
 
     }
 }

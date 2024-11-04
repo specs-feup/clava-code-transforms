@@ -1,7 +1,10 @@
 import { BinaryOp, IntLiteral, Loop, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdvancedTransform } from "./AdvancedTransform.js";
 
-export class LoopCharacterizer {
-    constructor() { }
+export class LoopCharacterizer extends AdvancedTransform {
+    constructor(silent: boolean = false) {
+        super("LoopCharacterizer", silent);
+    }
 
     public characterize(loop: Loop): LoopCharacterization {
         if (loop.kind == "for") {
@@ -15,7 +18,7 @@ export class LoopCharacterizer {
 
     private handleForLoop(loop: Loop): LoopCharacterization {
         if (loop.numChildren != 4) {
-            console.log("[LoopCharacterizer] ERROR: for-loop is non-canonical");
+            this.logError("for-loop is non-canonical");
             return this.getDefaultCharacterization();
         }
         const initExpr = loop.children[0];
@@ -279,9 +282,7 @@ export class LoopCharacterizer {
     }
 
     private handleWhileLoop(loop: any): LoopCharacterization {
-        console.log(
-            "[LoopCharacterizer] ERROR: while and do-while loops are not yet supported"
-        );
+        this.logWarning("while and do-while loops are not yet supported, ignoring...");
         return this.getDefaultCharacterization();
     }
 

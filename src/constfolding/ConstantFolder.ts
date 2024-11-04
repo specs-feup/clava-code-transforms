@@ -1,10 +1,13 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { BinaryOp, BoolLiteral, FloatLiteral, FunctionJp, IntLiteral, Literal, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdvancedTransform } from "../AdvancedTransform.js";
 
-export abstract class ConstantFolder {
+export abstract class ConstantFolder extends AdvancedTransform {
 
-    constructor() { }
+    constructor(silent: boolean = false) {
+        super("FoldingPropagation-ConstFolder", silent);
+    }
 
     public doPass(): number {
         let folds = 0;
@@ -64,7 +67,6 @@ export abstract class ConstantFolder {
         const isFloat = leftLit instanceof FloatLiteral || rightLit instanceof FloatLiteral;
 
         const newLit = this.doOperation(op.kind, n1, n2, isFloat);
-        const val = newLit != null ? (newLit instanceof FloatLiteral || newLit instanceof IntLiteral ? newLit.value : "NaN") : "NaN";
 
         if (newLit == null) {
             return false;

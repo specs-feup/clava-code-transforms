@@ -2,22 +2,14 @@ import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import { AdjustedType, ArrayType, BuiltinType, Call, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, TypedefType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
+import { AdvancedTransform } from "./AdvancedTransform.js";
 
-export class Outliner {
-    private verbose: boolean;
+export class Outliner extends AdvancedTransform {
     private defaultPrefix: string;
 
-    constructor() {
-        this.verbose = true;
+    constructor(silent: boolean = false) {
+        super("Outliner", silent);
         this.defaultPrefix = "__outlined_function_";
-    }
-
-    /**
-     * Sets the verbosity of the outliner, with false being the equivalent of a silent mode (true is the default)
-     * @param {boolean} verbose - the verbosity of the outliner
-     */
-    public setVerbosity(verbose: boolean): void {
-        this.verbose = verbose;
     }
 
     /**
@@ -52,26 +44,26 @@ export class Outliner {
      * These values are merely references, and all changes have already been committed to the AST at this point
      */
     public outlineWithName(begin: Statement, end: Statement, functionName: string, outlineAllDecls: boolean = false): [FunctionJp, Call] | [null, null] {
-        this.printMsg("Attempting to outline a region into a function named \"" + functionName + "\"");
+        this.log("Attempting to outline a region into a function named \"" + functionName + "\"");
 
         //------------------------------------------------------------------------------
         if (!this.checkOutline(begin, end)) {
-            this.printMsg("Provided code region is not outlinable! Aborting...");
+            this.logError("Provided code region is not outlinable! Aborting...");
             return [null, null];
         }
-        this.printMsg("Provided code region is outlinable");
+        this.log("Provided code region is outlinable");
 
         //------------------------------------------------------------------------------
         const wrappers = this.wrapBeginAndEnd(begin, end);
         begin = wrappers[0];
         end = wrappers[1];
-        this.printMsg("Wrapped outline region with begin and ending comments");
+        this.log("Wrapped outline region with begin and ending comments");
 
         //------------------------------------------------------------------------------
         //const parentFun: FunctionJp | null = this.findParentFunction(begin);
         const parentFun = begin.getAncestor("function") as FunctionJp | null;
         if (parentFun == null) {
-            this.printMsg("Could not find parent function for the outline region");
+            this.logError("Could not find parent function for the outline region");
             return [null, null];
         }
         const split = this.splitRegions(parentFun, begin, end);
@@ -79,17 +71,17 @@ export class Outliner {
         let region = split[1];
         const prologue = split[0];
         const epilogue = split[2];
-        this.printMsg("Found " + region.length + " statements for the outline region");
-        this.printMsg("Prologue has " + prologue.length + " statements, and epilogue has " + epilogue.length);
+        this.log("Found " + region.length + " statements for the outline region");
+        this.log("Prologue has " + prologue.length + " statements, and epilogue has " + epilogue.length);
 
         //------------------------------------------------------------------------------
         const globals = this.findGlobalVars();
-        this.printMsg("Found " + globals.length + " global variable(s)");
+        this.log("Found " + globals.length + " global variable(s)");
 
         //------------------------------------------------------------------------------
         const callPlaceholder = ClavaJoinPoints.stmtLiteral("//placeholder for the call to " + functionName);
         begin.insertBefore(callPlaceholder);
-        this.printMsg("Created a placeholder call to the new function");
+        this.log("Created a placeholder call to the new function");
 
         //------------------------------------------------------------------------------
         if (!outlineAllDecls) {
@@ -101,19 +93,19 @@ export class Outliner {
                 begin.insertBefore(decl);
                 prologue.push(decl);
             }
-            this.printMsg("Moved declarations from outline region to immediately before the region");
+            this.log("Moved declarations from outline region to immediately before the region");
         }
 
         //------------------------------------------------------------------------------
         const referencedInRegion = this.findRefsInRegion(region);
         const funParams = this.createParams(referencedInRegion);
         const fun = this.createFunction(functionName, region, funParams);
-        this.printMsg("Successfully created function \"" + functionName + "\"");
+        this.log("Successfully created function \"" + functionName + "\"");
 
         //------------------------------------------------------------------------------
         const callArgs = this.createArgs(fun, prologue, parentFun);
         let call = this.createCall(callPlaceholder, fun, callArgs);
-        this.printMsg("Successfully created call to \"" + functionName + "\"");
+        this.log("Successfully created call to \"" + functionName + "\"");
 
         //------------------------------------------------------------------------------
         // At this point, if the function has a premature return, it will be returning a value
@@ -124,11 +116,11 @@ export class Outliner {
         // return from the caller with the value returned by the callee.
         const newCall = this.ensureVoidReturn(fun, call);
         if (newCall != null) {
-            this.printMsg("Ensured that the outlined function returns void by parameterizing the early return(s)");
+            this.log("Ensured that the outlined function returns void by parameterizing the early return(s)");
             call = newCall;
         }
         else {
-            this.printMsg("No need to ensure that the outlined function returns void, as it has no early returns");
+            this.log("No need to ensure that the outlined function returns void, as it has no early returns");
         }
 
         //------------------------------------------------------------------------------
@@ -140,7 +132,7 @@ export class Outliner {
         // Victory, at last
         begin.detach();
         end.detach();
-        this.printMsg("Outliner cleanup finished");
+        this.log("Finished cleanup");
 
         return [fun, call];
     }
@@ -182,11 +174,11 @@ export class Outliner {
         const parentFun = begin.getAncestor("function") as FunctionJp | null;
 
         if (parentFun == null) {
-            this.printMsg("Requirement not met: outlinable region must be inside a function");
+            this.logError("Requirement not met: outlinable region must be inside a function");
             outlinable = false;
         }
         if (begin.parent.astId != end.parent.astId) {
-            this.printMsg("Requirement not met: begin and end joinpoints are not at the same scope level");
+            this.logError("Requirement not met: begin and end joinpoints are not at the same scope level");
             outlinable = false;
         }
         if (!outlinable) {
@@ -199,7 +191,7 @@ export class Outliner {
         const region = this.splitRegions(parentFun as FunctionJp, begin, end)[1];
 
         if (this.checkOutOfRegionGotos(region)) {
-            this.printMsg("Requirement not met: outlinable region must not contain any goto statements that jump outside of the region");
+            this.logError("Requirement not met: outlinable region must not contain any goto statements that jump outside of the region");
             outlinable = false;
         }
         return outlinable;
@@ -351,14 +343,16 @@ export class Outliner {
         }
 
         if (oldFun == null) {
-            throw new Error("Could not find parent function for the outline region");
+            const msg = "Could not find parent function for the outline region";
+            this.logError(msg);
+            throw new Error(msg);
         }
 
         let retType = ClavaJoinPoints.type("void");
         const returnStmts = this.findNonvoidReturnStmts(region);
         if (returnStmts.length > 0) {
             retType = returnStmts[0].children[0].type;
-            this.printMsg("Found " + returnStmts.length + " return statement(s) in the outline region");
+            this.log("Found " + returnStmts.length + " return statement(s) in the outline region");
         }
 
         const fun = ClavaJoinPoints.functionDecl(name, retType, ...params);
@@ -442,10 +436,10 @@ export class Outliner {
                 params.push(param);
             }
             else {
-                this.printMsg(`Unsupported param type "${varType.joinPointType}" for C/C++ type ${varType.code}`, true);
+                this.logWarning(`Unsupported param type "${varType.joinPointType}" for C/C++ type ${varType.code}`);
             }
         }
-        this.printMsg("Created " + params.length + " param(s) for the outlined function");
+        this.log("Created " + params.length + " param(s) for the outlined function");
         return params;
     }
 
@@ -482,16 +476,16 @@ export class Outliner {
                     }
                 } catch (e) {
                     if (e instanceof Error) {
-                        this.printMsg(e.stack as string);
+                        this.logError(e.stack as string);
                     }
                     else {
-                        this.printMsg("(No stack trace available)");
+                        this.logError("(No stack trace available)");
                     }
-                    this.printMsg("Exception while fetching varref with code " + varref.code);
+                    this.logError("Exception while fetching varref with code " + varref.code);
                 }
             }
         }
-        this.printMsg("Found " + varrefsNames.length + " external variable references inside outline region");
+        this.log("Found " + varrefsNames.length + " external variable references inside outline region");
         return varrefs;
     }
 
@@ -534,7 +528,7 @@ export class Outliner {
                 declsWithDependency.push(regionDecls[i]);
             }
         }
-        this.printMsg("Found " + declsWithDependency.length + " declaration(s) referenced after the outline region");
+        this.log("Found " + declsWithDependency.length + " declaration(s) referenced after the outline region");
         return declsWithDependency;
     }
 
@@ -570,11 +564,6 @@ export class Outliner {
             }
         }
         return [prologue, region, epilogue];
-    }
-
-    private printMsg(msg: string, overrideVerbosity = false) {
-        if (this.verbose || overrideVerbosity)
-            console.log("[Outliner] " + msg);
     }
 
     private generateFunctionName() {

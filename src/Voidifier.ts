@@ -2,9 +2,12 @@ import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Loop, Param, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
+import { AdvancedTransform } from "./AdvancedTransform.js";
 
-export class Voidifier {
-    constructor() { }
+export class Voidifier extends AdvancedTransform {
+    constructor(silent: boolean = false) {
+        super("Voidifier", silent);
+    }
 
     public voidify(fun: FunctionJp, returnVarName = "rtr_value"): boolean {
         const returnStmts = this.findNonvoidReturnStmts(fun);
@@ -23,6 +26,8 @@ export class Voidifier {
         for (const call of Query.search(Call, { "signature": fun.signature })) {
             this.handleCall(call, fun, retVarType);
         }
+
+        this.log(`Voidified function ${fun.name}`);
         return true;
     }
 

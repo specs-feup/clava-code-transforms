@@ -1,12 +1,15 @@
 import { ArrayAccess, BinaryOp, Call, ExprStmt, Literal, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
+import { AdvancedTransform } from "../AdvancedTransform.js";
 
 interface ExpressionType {
     propagateInExprType(stmt: ExprStmt, varName: string, lit: Literal): [boolean, number, boolean];
 }
 
-export class ExpressionPropagation {
-    constructor() { }
+export class ExpressionPropagation extends AdvancedTransform {
+    constructor(silent: boolean = false) {
+        super("FoldingPropagation-ExpressionProp", silent);
+    }
 
     public propagate(stmt: ExprStmt, varName: string, lit: Literal): [number, boolean] {
         const exprTypes: ExpressionType[] = [
@@ -31,7 +34,7 @@ export class ExpressionPropagation {
             }
         }
         if (!atLeastOneMatch) {
-            console.log("[ExpressionPropagation] No match for statement " + stmt.code.replace(/\n/g, " "));
+            this.log("No match for statement " + stmt.code.replace(/\n/g, " "));
         }
         return [replacements, canContinue];
     }

@@ -1,13 +1,16 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { ArrayAccess, BinaryOp, DeclStmt, ExprStmt, FunctionJp, If, Literal, Loop, ReturnStmt, Statement, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { ExpressionPropagation } from "./ExpressionPropagation.js";
+import { AdvancedTransform } from "../AdvancedTransform.js";
 
 interface PropagationPass {
     doPass(): number;
 }
 
-export class GlobalConstantPropagator implements PropagationPass {
-    constructor() { }
+export class GlobalConstantPropagator extends AdvancedTransform implements PropagationPass {
+    constructor(silent: boolean = false) {
+        super("FoldingPropagation-GlobalProp", silent);
+    }
 
     public doPass(): number {
         let replacements = 0;
@@ -88,10 +91,11 @@ export class GlobalConstantPropagator implements PropagationPass {
     }
 }
 
-export class FunctionConstantPropagator implements PropagationPass {
+export class FunctionConstantPropagator extends AdvancedTransform implements PropagationPass {
     private fun: FunctionJp;
 
-    constructor(fun: FunctionJp) {
+    constructor(fun: FunctionJp, silent: boolean = false) {
+        super("FoldingPropagation-FunctionProp", silent);
         this.fun = fun;
     }
 
@@ -187,7 +191,7 @@ export class FunctionConstantPropagator implements PropagationPass {
             return this.propagateInLoop(stmt, varName, lit);
         }
         else {
-            console.log(`[ConstantPropagator] Unsupported statement type: ${stmt.constructor.name}`);
+            this.log(`Unsupported statement type: ${stmt.constructor.name}`);
             return [0, true];
         }
     }
