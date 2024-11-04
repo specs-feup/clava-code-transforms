@@ -2,12 +2,11 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { BinaryOp, Call, DeclStmt, Expression, ExprStmt, FunctionJp, Joinpoint, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
+import { AdvancedTransform } from "./AdvancedTransform.js";
 
-export class StructDecomposer {
-    private silent;
-
+export class StructDecomposer extends AdvancedTransform {
     constructor(silent: boolean = false) {
-        this.silent = silent;
+        super("StructDecomposer", silent);
     }
 
     public decomposeAll(): string[] {
@@ -23,7 +22,7 @@ export class StructDecomposer {
         for (const structName in structs) {
             const struct = structs[structName];
             this.decompose(struct, structName);
-            this.log("------------------------------");
+            this.logLine();
             decompNames.push(structName);
         }
         return decompNames;
@@ -59,12 +58,6 @@ export class StructDecomposer {
 
         for (const param of params) {
             this.decomposeParam(param, struct);
-        }
-    }
-
-    private log(msg: string): void {
-        if (!this.silent) {
-            console.log(`[StructDecomp] ${msg}`);
         }
     }
 
@@ -167,7 +160,7 @@ export class StructDecomposer {
             }
         }
 
-        this.log("Could not decompose init: " + decl.code);
+        this.logWarning("Could not decompose init: " + decl.code);
         return initVars;
     }
 
@@ -194,7 +187,7 @@ export class StructDecomposer {
         }
         // Unknown case
         else {
-            this.log(`Could not replace ref: ${ref.code}`);
+            this.logWarning(`Could not replace ref: ${ref.parent.parent.code}`);
         }
     }
 

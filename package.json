@@ -31,7 +31,8 @@
   },
   "dependencies": {
     "@specs-feup/clava": "^3.0.1",
-    "@specs-feup/lara": "^3.0.2"
+    "@specs-feup/lara": "^3.0.2",
+    "chalk": "^5.3.0"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
