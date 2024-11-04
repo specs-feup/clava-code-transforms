@@ -49,7 +49,6 @@ export class Voidifier extends AdvancedTransform {
         }
 
         //Update calls with the actual values
-
         for (const call of Query.search(Call, { "signature": fun.signature })) {
             const newArgs: Expression[] = [];
             let i = 0;

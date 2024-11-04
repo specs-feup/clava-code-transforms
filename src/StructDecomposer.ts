@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, Call, DeclStmt, Expression, ExprStmt, FunctionJp, Joinpoint, MemberAccess, Param, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { BinaryOp, Call, DeclStmt, Expression, ExprStmt, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 
@@ -224,19 +224,30 @@ export class StructDecomposer extends AdvancedTransform {
         const rhsIsPointer = rightRef.type.isPointer;
         const lhsIsPointer = leftRef.type.isPointer;
 
-        const newExprs: ExprStmt[] = [];
+        const newExprs: Statement[] = [];
 
         for (const [fieldName, fieldDecl] of fieldDecls) {
             const lhsVarName = `${leftRef.name}_${fieldName}`;
             const rhsVarName = `${rightRef.name}_${fieldName}`;
 
             if (!lhsIsPointer && !rhsIsPointer) {
-                const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
-                const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
-                const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
-                const stmt = ClavaJoinPoints.exprStmt(assign);
+                if (fieldDecl.type.isArray) {
+                    const memcpyStr = `memcpy(&${lhsVarName}, &${rhsVarName}, sizeof(${rhsVarName}) / sizeof(${rhsVarName}[0]));`;
+                    const memcpy = ClavaJoinPoints.stmtLiteral(memcpyStr);
+                    const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+                    const stmt = ClavaJoinPoints.exprStmt(newLhs);
 
-                newExprs.push(stmt);
+                    newExprs.push(memcpy);
+                    newExprs.push(stmt);
+                }
+                else {
+                    const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+                    const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
+                    const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
+                    const stmt = ClavaJoinPoints.exprStmt(assign);
+
+                    newExprs.push(stmt);
+                }
             }
             else if (!lhsIsPointer && rhsIsPointer && rhsIsDeref) {
                 const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);

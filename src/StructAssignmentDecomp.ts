@@ -256,18 +256,17 @@ export class StructToStructAssignment implements StructAssignmentDecomposer {
             const rhsVarName = `${rhsVarref.name}_${fieldName}`;
 
             if (!lhsIsPointer && !rhsIsPointer) {
-                if (!field.type.isPointer) {
-                    const dummyRhs = ClavaJoinPoints.varRef(rhsVarName, field.type);
-                    const newLhs = ClavaJoinPoints.varDecl(lhsVarName, dummyRhs);
+                if (field.type.isPointer) {
+                    const memcpyStr = `memcpy(&${lhsVarName}, &${rhsVarName}, sizeof(${rhsVarName}) / sizeof(${rhsVarName}[0]));`;
+                    const memcpy = ClavaJoinPoints.stmtLiteral(memcpyStr);
+                    const newLhs = ClavaJoinPoints.varDeclNoInit(lhsVarName, field.type);
+                    decl.insertAfter(memcpy);
 
                     newVars.push([fieldName, newLhs]);
                 }
                 else {
-                    console.log(lhsVarName + ", " + rhsVarName);
-                    const memcpyStr = `memcpy(&${lhsVarName}, &${rhsVarName}, sizeof(&${rhsVarName}) / sizeof(${rhsVarName}[0]))`;
-                    const memcpy = ClavaJoinPoints.stmtLiteral(memcpyStr);
-                    const newLhs = ClavaJoinPoints.varDeclNoInit(lhsVarName, field.type);
-                    //decl.insertBefore(memcpy);
+                    const dummyRhs = ClavaJoinPoints.varRef(rhsVarName, field.type);
+                    const newLhs = ClavaJoinPoints.varDecl(lhsVarName, dummyRhs);
 
                     newVars.push([fieldName, newLhs]);
                 }

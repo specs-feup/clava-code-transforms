@@ -95,13 +95,13 @@ void testPointerStruct(Data *s)
 void testEverything(Data s1, Data *s2)
 {
     // S1
-    Data s3 = {102, 98.9, "foo"};
+    Data s3 = {102, 98.9, "fooooooooooooo"};
     // S2
     s3.id = 999;
     // S3
     s2->id = s3.id;
     // S4
-    Data *s4 = &(Data){106, 95.9, "bar"};
+    Data *s4 = &(Data){106, 95.9, "baaaaaar"};
     // S5
     s2->name = s4->name;
     // S6
