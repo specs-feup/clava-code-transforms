@@ -106,7 +106,6 @@ void testArrays(int x)
 {
     // A1
     Data a1[3];
-    Data a12[3 * x];
     // A2
     Data a2[3] = {{1, 2.0, "Data 1"}, {2, 3.0, "Data 2"}, {3, 4.0, "Data 3"}};
     // A3

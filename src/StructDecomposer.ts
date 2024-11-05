@@ -193,11 +193,12 @@ export class StructDecomposer extends AdvancedTransform {
             // This only works for one-dimensional arrays
             if (decl.type.isArray && !(decl.type instanceof VariableArrayType)) {
                 const arrayType = decl.type as ArrayType;
-                const newType = arrayType.copy() as ArrayType;
-                newType.setType(fieldType);
+                const arraySize = ClavaJoinPoints.exprLiteral(String(arrayType.arraySize));
+                const newType = ClavaJoinPoints.variableArrayType(field.type, arraySize);
 
                 const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, newType);
                 newVars.push([fieldName, newVar]);
+
             }
             else if (decl.type.isArray && decl.type instanceof VariableArrayType) {
                 this.logWarning("Variable array type not supported: " + decl.code);
