@@ -1,7 +1,7 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
-import { DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
+import { ArrayOfStructsAssignment, DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 
 export class StructDecomposer extends AdvancedTransform {
@@ -219,7 +219,8 @@ export class StructDecomposer extends AdvancedTransform {
             new DirectListAssignment(),
             new PointerListAssignment(),
             new MallocAssignment(),
-            new StructToStructAssignment()
+            new StructToStructAssignment(),
+            new ArrayOfStructsAssignment()
         ];
         for (const decomposer of decomposers) {
             if (decomposer.validate(decl)) {

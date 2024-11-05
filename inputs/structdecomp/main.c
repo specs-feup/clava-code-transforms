@@ -104,6 +104,8 @@ void testPointerStruct(Data *s)
 
 void testArrays(int x)
 {
+    int a[3];
+    a[0] = 1;
     // A1
     Data a1[3];
     // A2

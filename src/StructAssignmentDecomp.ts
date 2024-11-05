@@ -1,5 +1,6 @@
+import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { Call, Cast, Field, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { ArrayType, Call, Cast, Expression, ExprStmt, Field, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
 export interface StructAssignmentDecomposer {
@@ -24,12 +25,12 @@ export interface StructAssignmentDecomposer {
  */
 export class DirectListAssignment implements StructAssignmentDecomposer {
     validate(decl: Vardecl): boolean {
-        const cond1 = decl.children.length === 1;
-        if (!cond1) {
+        const cond1 = decl.children.length != 1;
+        const cond2 = decl.type.isArray;
+        if (cond1 || cond2) {
             return false;
         }
-        const cond2 = decl.children[0] instanceof InitList;
-        return cond2;
+        return decl.children[0] instanceof InitList;
     }
 
     decompose(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
@@ -288,6 +289,63 @@ export class StructToStructAssignment implements StructAssignmentDecomposer {
             }
         }
 
+        return newVars;
+    }
+}
+
+export class ArrayOfStructsAssignment implements StructAssignmentDecomposer {
+    validate(decl: Vardecl): boolean {
+        const isArray = decl.type.isArray;
+        if (!isArray) {
+            return false;
+        }
+        if (decl.children.length !== 1) {
+            return false;
+        }
+        if (!(decl.children[0] instanceof InitList)) {
+            return false;
+        }
+        return true;
+    }
+
+    decompose(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
+        const newVars: [string, Vardecl][] = [];
+
+        for (const field of fields) {
+            const fieldName = field.name;
+            const newVarName = `${decl.name}_${fieldName}`;
+
+            const arrayType = decl.type as ArrayType;
+            const arraySize = ClavaJoinPoints.exprLiteral(String(arrayType.arraySize));
+            const newType = ClavaJoinPoints.variableArrayType(field.type, arraySize);
+
+            const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, newType);
+            newVars.push([fieldName, newVar]);
+        }
+
+        const arrayAccesses: ExprStmt[] = [];
+        const initMasterList = decl.children[0] as InitList;
+
+        for (let i = 0; i < initMasterList.children.length; i++) {
+            const initList = initMasterList.children[i] as InitList;
+            const idx = ClavaJoinPoints.integerLiteral(i) as IntLiteral;
+
+            for (let j = 0; j < fields.length; j++) {
+                const arrayDecl = newVars[j][1];
+                // alternative: actually create an ArrayAccess using the ref and idx
+                const arrayAccess = ClavaJoinPoints.exprLiteral(`${arrayDecl.name}[${idx.value}]`);
+                const fieldInit = initList.children[j];
+
+                if (!(fieldInit instanceof ImplicitValue)) {
+                    const binaryOp = ClavaJoinPoints.binaryOp("assign", arrayAccess, ClavaJoinPoints.exprLiteral(fieldInit.code));
+                    const expr = ClavaJoinPoints.exprStmt(binaryOp);
+                    arrayAccesses.push(expr);
+                }
+            }
+        }
+        for (const expr of arrayAccesses.reverse()) {
+            decl.insertAfter(expr);
+        }
         return newVars;
     }
 }
