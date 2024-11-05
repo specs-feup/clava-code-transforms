@@ -150,9 +150,10 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private decomposeDecl(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
-        const newVars: [string, Vardecl][] = decl.hasInit ?
-            this.createNewVarsWithInit(decl, fields) :
-            this.createNewVarsNoInit(decl, fields);
+        const newVars: [string, Vardecl][] =
+            this.isInitialized(decl) ?
+                this.createNewVarsWithInit(decl, fields) :
+                this.createNewVarsNoInit(decl, fields);
 
         for (const [_, newVar] of newVars.reverse()) {
             const parentStmt = decl.getAncestor("declStmt") as DeclStmt;
@@ -161,6 +162,19 @@ export class StructDecomposer extends AdvancedTransform {
         }
 
         return newVars;
+    }
+
+    private isInitialized(decl: Vardecl) {
+        if (!decl.hasInit) {
+            return false;
+        }
+        if (decl.children.length == 1) {
+            const child = decl.children[0];
+            if ((child instanceof Expression) && child.children.length == 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private createNewVarsNoInit(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
@@ -184,7 +198,6 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private createNewVarsWithInit(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
-
         let initVars: [string, Vardecl][] = [];
 
         const decomposers: StructAssignmentDecomposer[] = [
@@ -204,6 +217,7 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private replaceRef(ref: Varref, fieldDecls: [string, Vardecl][]): void {
+
         // If the varref is a member access, replace it with a ref to the field decl
         if (ref.parent instanceof MemberAccess) {
             this.replaceRefByField(ref, fieldDecls);

@@ -1,3 +1,8 @@
 {
-  "workbench.colorTheme": "Nord"
+  "workbench.colorTheme": "Nord",
+  "files.associations": {
+    "string": "cpp",
+    "cstdio": "cpp",
+    "sstream": "cpp"
+  }
 }
