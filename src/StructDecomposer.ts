@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, TypedefDecl, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 
@@ -119,7 +119,7 @@ export class StructDecomposer extends AdvancedTransform {
             const type = decl.type;
             const typeName = type.code.replace("*", "").replace("struct ", "").trim();
 
-            if (typeName === name && !decl.isParam) {
+            if (typeName.startsWith(name) && !decl.isParam) {
                 decls.push(decl);
             }
         }
@@ -190,8 +190,22 @@ export class StructDecomposer extends AdvancedTransform {
                 fieldType = ClavaJoinPoints.pointer(fieldType);
             }
 
-            const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, fieldType);
-            newVars.push([fieldName, newVar]);
+            // This only works for one-dimensional arrays
+            if (decl.type.isArray && !(decl.type instanceof VariableArrayType)) {
+                const arrayType = decl.type as ArrayType;
+                const newType = arrayType.copy() as ArrayType;
+                newType.setType(fieldType);
+
+                const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, newType);
+                newVars.push([fieldName, newVar]);
+            }
+            else if (decl.type.isArray && decl.type instanceof VariableArrayType) {
+                this.logWarning("Variable array type not supported: " + decl.code);
+            }
+            else {
+                const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, fieldType);
+                newVars.push([fieldName, newVar]);
+            }
         }
 
         return newVars;

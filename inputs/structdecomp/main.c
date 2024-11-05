@@ -30,7 +30,7 @@ typedef struct
     pixel_t y;
     pixel_t z;
 } gradient_t;
-
+/*
 Point3D globalPoint3D;
 
 void usePoint2D(struct Point2D point)
@@ -100,7 +100,22 @@ void testCopyStruct(Data s)
 void testPointerStruct(Data *s)
 {
 }
+*/
 
+void testArrays(int x)
+{
+    // A1
+    Data a1[3];
+    Data a12[3 * x];
+    // A2
+    Data a2[3] = {{1, 2.0, "Data 1"}, {2, 3.0, "Data 2"}, {3, 4.0, "Data 3"}};
+    // A3
+    Data a3[3] = {1, 2.0, "Data 1", 2, 3.0, "Data 2", 3, 4.0, "Data 3"};
+    // A4
+    Data *a4 = (Data *)malloc(3 * sizeof(Data));
+}
+
+/*
 void testEverything(Data s1, Data *s2)
 {
     // S1
@@ -228,3 +243,4 @@ int main()
 
     return 0;
 }
+*/
