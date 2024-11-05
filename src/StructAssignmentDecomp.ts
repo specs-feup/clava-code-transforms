@@ -1,6 +1,6 @@
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { ArrayType, Call, Cast, Expression, ExprStmt, Field, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { ArrayType, BinaryOp, Call, Cast, Expression, ExprStmt, Field, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
 export interface StructAssignmentDecomposer {
@@ -161,8 +161,11 @@ export class MallocAssignment implements StructAssignmentDecomposer {
         const possibleCall = decl.children[0] instanceof Cast ? decl.children[0].children[0] : decl.children[0];
 
         if (possibleCall instanceof Call) {
-            const cond2 = ["calloc", "malloc"].includes(possibleCall.name);
+            const cond2 = [/*"calloc",*/ "malloc"].includes(possibleCall.name);
             if (!cond2) {
+                if (possibleCall.name == "calloc") {
+                    console.log(`[MallocAssignment] calloc is not supported yet`);
+                }
                 return false;
             }
 
@@ -173,8 +176,10 @@ export class MallocAssignment implements StructAssignmentDecomposer {
                 if (!isSizeof) {
                     return false;
                 }
-                const isSameStruct = decl.type.code.indexOf(lastArg.argType.code) !== -1;
-                if (!isSameStruct) {
+                const simpleDeclType = decl.type.code.replace("*", "").replace("struct ", "").trim();
+                const simpleLastArgType = lastArg.argType.code.replace("*", "").replace("struct ", "").trim();
+
+                if (simpleDeclType !== simpleLastArgType) {
                     console.log(`[MallocAssignment] Different types in malloc/calloc: ${decl.type.code} and ${lastArg.argType.code}`);
                     return false;
                 }
@@ -184,6 +189,28 @@ export class MallocAssignment implements StructAssignmentDecomposer {
                 const val = lastArg.value;
                 const structName = decl.type.code.replace("*", "").replace("struct ", "").trim();
                 console.log(`[MallocAssignment] malloc/calloc size with constant size ${val}, assuming this is enough for struct type ${structName}`);
+                return true;
+            }
+            else if (lastArg instanceof BinaryOp) {
+                const lhs = lastArg.left;
+                const rhs = lastArg.right;
+
+                const sizeof = (lhs instanceof UnaryExprOrType && lhs.kind === "sizeof") ?
+                    lhs : (rhs instanceof UnaryExprOrType && rhs.kind === "sizeof") ? rhs : undefined;
+                const factor = (lhs instanceof IntLiteral) ? lhs : (rhs instanceof IntLiteral) ? rhs : undefined;
+
+                if (sizeof === undefined || factor === undefined || factor.astId == sizeof.astId) {
+                    console.log(`[MallocAssignment] Unknown malloc/calloc size given by binary op`);
+                    return false;
+                }
+
+                const simpleDeclType = decl.type.code.replace("*", "").replace("struct ", "").trim();
+                const simpleLastArgType = sizeof.argType.code.replace("*", "").replace("struct ", "").trim();
+
+                if (simpleDeclType !== simpleLastArgType) {
+                    console.log(`[MallocAssignment] Different types in malloc/calloc: ${decl.type.code} and ${sizeof.argType.code}`);
+                    return false;
+                }
                 return true;
             }
             else {
@@ -205,7 +232,20 @@ export class MallocAssignment implements StructAssignmentDecomposer {
             const fieldName = fields[i].name;
             const newVarName = `${decl.name}_${fieldName}`;
 
-            const sizeofArg = ClavaJoinPoints.exprLiteral(`sizeof(${type.code})`);
+            const lastArg = Query.searchFrom(decl, Call).first()!.args[0];
+            let sizeofArg: Expression;
+
+            if (lastArg instanceof BinaryOp) {
+                const lhs = lastArg.left;
+                const rhs = lastArg.right;
+
+                const factor = (lhs instanceof IntLiteral) ? lhs : (rhs instanceof IntLiteral) ? rhs : undefined;
+
+                sizeofArg = ClavaJoinPoints.binaryOp("*", ClavaJoinPoints.exprLiteral(`sizeof(${type.code})`), factor!);
+            }
+            else {
+                sizeofArg = ClavaJoinPoints.exprLiteral(`sizeof(${type.code})`);
+            }
 
             const call = ClavaJoinPoints.callFromName("malloc", ClavaJoinPoints.type("void*"), sizeofArg);
             const cast = ClavaJoinPoints.cStyleCast(pointerType, call);
