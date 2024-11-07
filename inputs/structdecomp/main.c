@@ -119,6 +119,15 @@ void testArrays(int x)
     int y = a2[2].id;
     // A8
     a1[0] = a2[0];
+
+    // A5
+    // a1[0].id = 1;
+    // A6
+    // a1[0].value = a2[0].value;
+    // A7
+    // int y = a2[2].id;
+    // A8
+    // a1[0] = a2[0];
 }
 
 void testEverything(Data s1, Data *s2)

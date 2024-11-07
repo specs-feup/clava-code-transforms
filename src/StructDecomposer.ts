@@ -152,8 +152,6 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private decomposeDecl(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
-        console.log(decl.code);
-
         const newVars: [string, Vardecl][] =
             this.isInitialized(decl) ?
                 this.createNewVarsWithInit(decl, fields) :
@@ -318,13 +316,25 @@ export class StructDecomposer extends AdvancedTransform {
             const rhsVarName = `${rightRef.name}_${fieldName}`;
 
             // foo = bar
-            if (!lhsIsPointer && !rhsIsPointer) {
-                const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
-                const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
-                const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
-                const stmt = ClavaJoinPoints.exprStmt(assign);
+            if (!lhsIsPointer && !rhsIsPointer && !lhsIsArray && !rhsIsArray) {
+                if (fieldDecl.type.isArray) {
+                    const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+                    const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
+                    const sizeof = ClavaJoinPoints.integerLiteral(fieldDecl.type.arraySize);
+                    const retType = ClavaJoinPoints.type("void*");
+                    const call = ClavaJoinPoints.callFromName("memcpy", retType, newLhs, newRhs, sizeof);
+                    const stmt = ClavaJoinPoints.exprStmt(call);
 
-                newExprs.push(stmt);
+                    newExprs.push(stmt);
+                }
+                else {
+                    const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+                    const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
+                    const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
+                    const stmt = ClavaJoinPoints.exprStmt(assign);
+
+                    newExprs.push(stmt);
+                }
             }
             // foo = *bar
             else if (!lhsIsPointer && rhsIsPointer && rhsIsDeref) {
@@ -337,7 +347,6 @@ export class StructDecomposer extends AdvancedTransform {
 
                 newExprs.push(stmt);
             }
-            // foo = bar, where foo and bar are pointers
             else if (lhsIsPointer && rhsIsPointer) {
                 const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
                 const newRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
