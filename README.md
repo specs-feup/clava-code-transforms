@@ -263,10 +263,6 @@ const decomp = new StructDecomposer(true /* false to enable silent mode*/);
 const structNames = decomp.decomposeAll();
 ```
 
-### Switch-to-If conversion
-
-Not yet implemented
-
 ### Function voidification
 
 Ensures that a given function returns void, for instance:
