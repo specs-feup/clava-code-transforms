@@ -510,17 +510,5 @@ export class StructDecomposer extends AdvancedTransform {
 
         return newParams;
     }
-
-    private simpleType(type: Type): string {
-        return type.code
-            .replace("*", "")
-            .replace("struct ", "")
-            .replace("const ", "")
-            .replace("volatile ", "")
-            .replace("unsigned ", "")
-            .replace("signed ", "")
-            .replace(/\[\d+\]/g, "")    // square brackets
-            .trim();
-    }
 }
 

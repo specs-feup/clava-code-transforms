@@ -1,3 +1,4 @@
+import { Type } from "@specs-feup/clava/api/Joinpoints.js";
 import chalk from "chalk";
 
 export abstract class AdvancedTransform {
@@ -7,6 +8,18 @@ export abstract class AdvancedTransform {
     constructor(name: string, silent?: boolean) {
         this.transformName = name;
         this.silent = silent || false;
+    }
+
+    protected simpleType(type: Type): string {
+        return type.code
+            .replace("*", "")
+            .replace("struct ", "")
+            .replace("const ", "")
+            .replace("volatile ", "")
+            .replace("unsigned ", "")
+            .replace("signed ", "")
+            .replace(/\[\d+\]/g, "")    // square brackets
+            .trim();
     }
 
     protected log(msg: string, level: "INFO" | "WARN" | "ERROR" = "INFO") {
