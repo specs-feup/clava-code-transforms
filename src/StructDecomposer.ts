@@ -237,7 +237,12 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private replaceRef(ref: Varref, fieldDecls: [string, Vardecl][]): void {
-        // If it's part of a struct-to-struct assignment, decompose it later
+        if (ref.code == "output") {
+            console.log(ref.parent.joinPointType);
+            console.log(ref.parent.parent.joinPointType);
+            console.log(ref.parent.parent.parent.joinPointType);
+        }
+        // If it's part of a decl struct-to-struct assignment, decompose it later
         if (ref.getAncestor("vardecl") != null) {
             const decl = ref.getAncestor("vardecl") as Vardecl;
             const declType = this.simpleType(decl.type);
@@ -252,7 +257,7 @@ export class StructDecomposer extends AdvancedTransform {
             this.replaceRefByField(ref, fieldDecls);
         }
         // Varref is a member access in an array of structs, e.g., foo[0].bar
-        else if (ref.parent instanceof ArrayAccess && ref.parent.parent instanceof MemberAccess) {
+        else if (ref.parent instanceof ArrayAccess && ref.parent.getAncestor("memberAccess") != null) {
             this.replaceArrayRefByField(ref, fieldDecls);
         }
         // Struct-to-struct assignment, e.g., foo = bar
@@ -395,7 +400,7 @@ export class StructDecomposer extends AdvancedTransform {
 
     private replaceArrayRefByField(ref: Varref, fieldDecls: [string, Vardecl][]): void {
         const arrayAccess = ref.parent as ArrayAccess;
-        const memberAccess = arrayAccess.parent as MemberAccess;
+        const memberAccess = ref.parent.getAncestor("memberAccess") as MemberAccess;
 
         const fieldName = memberAccess.name;
         const fieldArray = fieldDecls.find(([name, _]) => name === fieldName)![1];
@@ -507,7 +512,15 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private simpleType(type: Type): string {
-        return type.code.replace("*", "").replace("struct ", "").trim();
+        return type.code
+            .replace("*", "")
+            .replace("struct ", "")
+            .replace("const ", "")
+            .replace("volatile ", "")
+            .replace("unsigned ", "")
+            .replace("signed ", "")
+            .replace(/\[\d+\]/g, "")    // square brackets
+            .trim();
     }
 }
 
