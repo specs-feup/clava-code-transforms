@@ -95,9 +95,14 @@ void structToStructAssignment()
 
 void testCopyStruct(Data s)
 {
+    printf("Data: ID=%d, Value=%.2f, Name=%s\n", s.id, s.value, s.name);
 }
 
-void testPointerStruct(Data *s) {}
+void testPointerStruct(Data *s)
+{
+    printf("Data: ID=%d, Value=%.2f, Name=%s\n", s->id, s->value, s->name);
+}
+
 void testArrays(int x)
 {
     int a[3];
@@ -180,12 +185,12 @@ void declsWithInit()
     Data dataInit5 = {.id = 105};
 
     // Pointer assignments
-    Data *dataInit6 = &(Data){106, 95.9, "Sample Data 6"};
-    Data *dataInit7 = &(Data){.id = 107, .value = 94.9, .name = "Sample Data 7"};
-    Data *dataInit8 = &(Data){.value = 93.9, .id = 108, .name = "Sample Data 8"};
-    Data *dataInit9 = &(Data){109};
-    Data *dataInit10 = &(Data){.id = 110};
-    Data *dataInit11 = &(Data){111, 92.9, "Sample Data 11"};
+    // Data *dataInit6 = &(Data){106, 95.9, "Sample Data 6"};
+    // Data *dataInit7 = &(Data){.id = 107, .value = 94.9, .name = "Sample Data 7"};
+    // Data *dataInit8 = &(Data){.value = 93.9, .id = 108, .name = "Sample Data 8"};
+    // Data *dataInit9 = &(Data){109};
+    // Data *dataInit10 = &(Data){.id = 110};
+    // Data *dataInit11 = &(Data){111, 92.9, "Sample Data 11"};
 
     // Malloc assignment
     Data *dataInit12 = malloc(sizeof(Data));

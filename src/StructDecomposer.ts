@@ -409,7 +409,8 @@ export class StructDecomposer extends AdvancedTransform {
 
     private replaceRefArg(ref: Varref, fieldDecls: [string, Vardecl][]): void {
         const call = ref.getAncestor("call") as Call;
-        const newArgs = [];
+        let refIndex = -1;
+        const newArgs: Expression[] = [];
 
         for (let i = 0; i < call.args.length; i++) {
             const arg = call.args[i] as Expression;
@@ -421,6 +422,7 @@ export class StructDecomposer extends AdvancedTransform {
                     const newArg = ClavaJoinPoints.varRef(newVar);
                     newArgs.push(newArg);
                 }
+                refIndex = i;
             }
             // doSomething(Data bar) -> Data *bar; doSomething(*bar)
             else if (arg instanceof UnaryOp && arg.kind === "deref" && arg.children[0] instanceof Varref) {
@@ -429,6 +431,7 @@ export class StructDecomposer extends AdvancedTransform {
                     const newArg = ClavaJoinPoints.unaryOp("*", newRef);
                     newArgs.push(newArg);
                 }
+                refIndex = i;
             }
             // doSomething(Data *bar) -> Data bar; doSomething(&bar)
             else if (arg instanceof UnaryOp && arg.kind === "addr_of" && arg.children[0] instanceof Varref) {
@@ -437,12 +440,15 @@ export class StructDecomposer extends AdvancedTransform {
                     const newArg = ClavaJoinPoints.unaryOp("&", newRef);
                     newArgs.push(newArg);
                 }
-            }
-            else {
-                newArgs.push(arg);
+                refIndex = i;
             }
         }
-        const newCall = ClavaJoinPoints.call(call.function, ...newArgs);
+        const prologue = call.args.slice(0, refIndex) as Expression[];
+        const reversedArgs = newArgs.reverse();
+        const epilogue = call.args.slice(refIndex + 1) as Expression[];
+        const fullArgs = [...prologue, ...reversedArgs, ...epilogue];
+
+        const newCall = ClavaJoinPoints.call(call.function, ...fullArgs);
         call.replaceWith(newCall);
     }
 
