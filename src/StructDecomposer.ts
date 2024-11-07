@@ -55,6 +55,7 @@ export class StructDecomposer extends AdvancedTransform {
         for (const decl of decls) {
             this.decomposeDeclAndRefs(decl, fields);
         }
+        this.logLine();
 
         const params = this.getAllParamsOfStruct(name);
         this.log(`Found ${params.length} params for struct "${name}"`);
@@ -127,6 +128,7 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private decomposeDeclAndRefs(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
+        this.log(`Decomposing decl: ${decl.code}`);
         // First, decompose the decl
         const fieldDecls = this.decomposeDecl(decl, fields);
 
@@ -150,6 +152,8 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private decomposeDecl(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
+        console.log(decl.code);
+
         const newVars: [string, Vardecl][] =
             this.isInitialized(decl) ?
                 this.createNewVarsWithInit(decl, fields) :
@@ -170,6 +174,9 @@ export class StructDecomposer extends AdvancedTransform {
         }
         if (decl.children.length == 1) {
             const child = decl.children[0];
+            if (child instanceof Varref) {
+                return true;
+            }
             if ((child instanceof Expression) && child.children.length == 0) {
                 return false;
             }
@@ -234,12 +241,16 @@ export class StructDecomposer extends AdvancedTransform {
 
     private replaceRef(ref: Varref, fieldDecls: [string, Vardecl][]): void {
 
+        // If it's part of a struct-to-struct assignment, decompose it later
+        if (ref.getAncestor("vardecl") != null) {
+            this.log(`Ref to ${ref.code} is part of an assignment, decomposing it later`);
+        }
         // If the varref is a member access, replace it with a ref to the field decl
-        if (ref.parent instanceof MemberAccess) {
+        else if (ref.parent instanceof MemberAccess) {
             this.replaceRefByField(ref, fieldDecls);
         }
         // Varref is a member access in an array of structs, e.g., foo[0].bar
-        if (ref.parent instanceof ArrayAccess && ref.parent.parent instanceof MemberAccess) {
+        else if (ref.parent instanceof ArrayAccess && ref.parent.parent instanceof MemberAccess) {
             this.replaceArrayRefByField(ref, fieldDecls);
         }
         // Struct-to-struct assignment, e.g., foo = bar
@@ -250,7 +261,7 @@ export class StructDecomposer extends AdvancedTransform {
                 const leftRef = Query.searchFromInclusive(binaryOp.left, Varref).first() as Varref;
                 const rightRef = Query.searchFromInclusive(binaryOp.right, Varref).first() as Varref;
 
-                this.replaceScalarRef(leftRef, rightRef, fieldDecls);
+                this.replaceStructToStructAssignment(leftRef, rightRef, fieldDecls);
 
                 binaryOp.parent.detach();
             }
@@ -261,7 +272,7 @@ export class StructDecomposer extends AdvancedTransform {
         }
         // Unknown case
         else {
-            this.logWarning(`Could not replace ref: ${ref.parent.parent.code}`);
+            this.logWarning(`Could not replace ref: ${ref.code}`);
         }
     }
 
@@ -292,11 +303,13 @@ export class StructDecomposer extends AdvancedTransform {
         }
     }
 
-    private replaceScalarRef(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][]): void {
+    private replaceStructToStructAssignment(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][]): void {
         const rhsIsDeref = rightRef.parent instanceof UnaryOp && rightRef.parent.kind === "deref";
         const rhsIsAddrOf = rightRef.parent instanceof UnaryOp && rightRef.parent.kind === "addr_of";
         const rhsIsPointer = rightRef.type.isPointer;
         const lhsIsPointer = leftRef.type.isPointer;
+        const lhsIsArray = leftRef.parent instanceof ArrayAccess;
+        const rhsIsArray = rightRef.parent instanceof ArrayAccess;
 
         const newExprs: Statement[] = [];
 
@@ -304,6 +317,7 @@ export class StructDecomposer extends AdvancedTransform {
             const lhsVarName = `${leftRef.name}_${fieldName}`;
             const rhsVarName = `${rightRef.name}_${fieldName}`;
 
+            // foo = bar
             if (!lhsIsPointer && !rhsIsPointer) {
                 const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
                 const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
@@ -312,6 +326,7 @@ export class StructDecomposer extends AdvancedTransform {
 
                 newExprs.push(stmt);
             }
+            // foo = *bar
             else if (!lhsIsPointer && rhsIsPointer && rhsIsDeref) {
                 const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
                 const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
@@ -322,6 +337,7 @@ export class StructDecomposer extends AdvancedTransform {
 
                 newExprs.push(stmt);
             }
+            // foo = bar, where foo and bar are pointers
             else if (lhsIsPointer && rhsIsPointer) {
                 const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
                 const newRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
@@ -331,6 +347,7 @@ export class StructDecomposer extends AdvancedTransform {
 
                 newExprs.push(stmt);
             }
+            // foo = &bar, where foo is a pointer and bar is not
             else if (lhsIsPointer && !rhsIsPointer && rhsIsAddrOf) {
                 const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
                 const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);

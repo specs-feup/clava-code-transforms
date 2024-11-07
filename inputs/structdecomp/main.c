@@ -117,8 +117,10 @@ void testArrays(int x)
     a1[0].value = a2[0].value;
     // A7
     int y = a2[2].id;
+    // A8
+    a1[0] = a2[0];
 }
-/*
+
 void testEverything(Data s1, Data *s2)
 {
     // S1
@@ -158,6 +160,7 @@ void testEverything(Data s1, Data *s2)
     // S14
     s8 = &s3;
 }
+/*
 
 void createData(int id, float value, const char *name, Data *data)
 {

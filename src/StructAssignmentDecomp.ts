@@ -43,7 +43,6 @@ export class DirectListAssignment implements StructAssignmentDecomposer {
             const fieldName = field.name;
             const fieldInit = initList.children[i];
             const newVarName = `${decl.name}_${fieldName}`;
-            console.log(`[DirectListAssignment] Field ${fieldName} with init ${fieldInit}`);
 
             if (fieldInit instanceof ImplicitValue) {
                 const newVar = ClavaJoinPoints.varDeclNoInit(newVarName, field.type);
