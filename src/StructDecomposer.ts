@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { ArrayOfStructsAssignment, DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 
@@ -238,6 +238,10 @@ export class StructDecomposer extends AdvancedTransform {
         if (ref.parent instanceof MemberAccess) {
             this.replaceRefByField(ref, fieldDecls);
         }
+        // Varref is a member access in an array of structs, e.g., foo[0].bar
+        if (ref.parent instanceof ArrayAccess && ref.parent.parent instanceof MemberAccess) {
+            this.replaceArrayRefByField(ref, fieldDecls);
+        }
         // Struct-to-struct assignment, e.g., foo = bar
         else if (ref.getAncestor("binaryOp") != null) {
             const binaryOp = ref.getAncestor("binaryOp") as BinaryOp;
@@ -246,7 +250,8 @@ export class StructDecomposer extends AdvancedTransform {
                 const leftRef = Query.searchFromInclusive(binaryOp.left, Varref).first() as Varref;
                 const rightRef = Query.searchFromInclusive(binaryOp.right, Varref).first() as Varref;
 
-                this.replaceRefByAllFields(leftRef, rightRef, fieldDecls);
+                this.replaceScalarRef(leftRef, rightRef, fieldDecls);
+
                 binaryOp.parent.detach();
             }
         }
@@ -287,7 +292,7 @@ export class StructDecomposer extends AdvancedTransform {
         }
     }
 
-    private replaceRefByAllFields(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][]): void {
+    private replaceScalarRef(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][]): void {
         const rhsIsDeref = rightRef.parent instanceof UnaryOp && rightRef.parent.kind === "deref";
         const rhsIsAddrOf = rightRef.parent instanceof UnaryOp && rightRef.parent.kind === "addr_of";
         const rhsIsPointer = rightRef.type.isPointer;
@@ -300,23 +305,12 @@ export class StructDecomposer extends AdvancedTransform {
             const rhsVarName = `${rightRef.name}_${fieldName}`;
 
             if (!lhsIsPointer && !rhsIsPointer) {
-                if (fieldDecl.type.isArray) {
-                    const memcpyStr = `memcpy(&${lhsVarName}, &${rhsVarName}, sizeof(${rhsVarName}) / sizeof(${rhsVarName}[0]));`;
-                    const memcpy = ClavaJoinPoints.stmtLiteral(memcpyStr);
-                    const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
-                    const stmt = ClavaJoinPoints.exprStmt(newLhs);
+                const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+                const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
+                const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
+                const stmt = ClavaJoinPoints.exprStmt(assign);
 
-                    newExprs.push(memcpy);
-                    newExprs.push(stmt);
-                }
-                else {
-                    const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
-                    const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
-                    const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
-                    const stmt = ClavaJoinPoints.exprStmt(assign);
-
-                    newExprs.push(stmt);
-                }
+                newExprs.push(stmt);
             }
             else if (!lhsIsPointer && rhsIsPointer && rhsIsDeref) {
                 const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
@@ -351,6 +345,20 @@ export class StructDecomposer extends AdvancedTransform {
         for (const expr of newExprs) {
             leftRef.parent.insertAfter(expr);
         }
+    }
+
+    private replaceArrayRefByField(ref: Varref, fieldDecls: [string, Vardecl][]): void {
+        const arrayAccess = ref.parent as ArrayAccess;
+        const memberAccess = arrayAccess.parent as MemberAccess;
+
+        const fieldName = memberAccess.name;
+        const fieldArray = fieldDecls.find(([name, _]) => name === fieldName)![1];
+
+        const arrayAccessCopy = arrayAccess.copy();
+        const newVarref = ClavaJoinPoints.varRef(fieldArray);
+        arrayAccessCopy.setFirstChild(newVarref);
+
+        memberAccess.replaceWith(arrayAccessCopy);
     }
 
     private replaceRefArg(ref: Varref, fieldDecls: [string, Vardecl][]): void {

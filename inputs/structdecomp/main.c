@@ -96,12 +96,8 @@ void structToStructAssignment()
 void testCopyStruct(Data s)
 {
 }
-
-void testPointerStruct(Data *s)
-{
-}
 */
-
+void testPointerStruct(Data *s) {}
 void testArrays(int x)
 {
     int a[3];
@@ -114,8 +110,14 @@ void testArrays(int x)
     Data a3[3] = {1, 2.0, "Data 1", 2, 3.0, "Data 2", 3, 4.0, "Data 3"};
     // A4
     Data *a4 = (Data *)malloc(3 * sizeof(Data));
-}
 
+    // A5
+    a1[0].id = 1;
+    // A6
+    a1[0].value = a2[0].value;
+    // A7
+    int y = a2[2].id;
+}
 /*
 void testEverything(Data s1, Data *s2)
 {
@@ -241,6 +243,8 @@ int main()
 
     Data *funData1;
     createData(1, 2.0, "Data 1", funData1);
+
+    myData.id = 102;
 
     return 0;
 }
