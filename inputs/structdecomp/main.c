@@ -135,8 +135,12 @@ void testEverything(Data s1, Data *s2)
     // S3
     s2->id = s3.id;
     // S4
-    Data *s4 = &(Data){106, 95.9, "baaaaaar"};
-    // S5
+    Data *s4 = (Data *)malloc(sizeof(Data));
+    s4->id = 106;
+    s4->value = 95.9;
+    s4->name = "baaaaaar";
+    // Data *s4 = &(Data){106, 95.9, "baaaaaar"};
+    //  S5
     s2->name = s4->name;
     // S6
     testCopyStruct(s3);
@@ -245,8 +249,6 @@ int main()
 
     // Clean up and free allocated memory
     free(myData.name);
-
-    foo();
 
     Data *funData1;
     createData(1, 2.0, "Data 1", funData1);
