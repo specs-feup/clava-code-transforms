@@ -30,7 +30,7 @@ typedef struct
     pixel_t y;
     pixel_t z;
 } gradient_t;
-/*
+
 Point3D globalPoint3D;
 
 void usePoint2D(struct Point2D point)
@@ -96,7 +96,7 @@ void structToStructAssignment()
 void testCopyStruct(Data s)
 {
 }
-*/
+
 void testPointerStruct(Data *s) {}
 void testArrays(int x)
 {
@@ -160,7 +160,6 @@ void testEverything(Data s1, Data *s2)
     // S14
     s8 = &s3;
 }
-/*
 
 void createData(int id, float value, const char *name, Data *data)
 {
@@ -251,4 +250,3 @@ int main()
 
     return 0;
 }
-*/

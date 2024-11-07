@@ -340,6 +340,22 @@ export class StructDecomposer extends AdvancedTransform {
                     newExprs.push(stmt);
                 }
             }
+            if (!lhsIsPointer && !rhsIsPointer && lhsIsArray && rhsIsArray) {
+                const lhsArrayAccess = leftRef.parent as ArrayAccess;
+                const newLhsVar = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+                const newLhs = lhsArrayAccess.copy() as ArrayAccess;
+                newLhs.setFirstChild(newLhsVar);
+
+                const rhsArrayAccess = rightRef.parent as ArrayAccess;
+                const newRhsVar = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
+                const newRhs = rhsArrayAccess.copy() as ArrayAccess;
+                newRhs.setFirstChild(newRhsVar);
+
+                const binOp = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
+                const stmt = ClavaJoinPoints.exprStmt(binOp);
+
+                newExprs.push(stmt);
+            }
             // foo = *bar
             else if (!lhsIsPointer && rhsIsPointer && rhsIsDeref) {
                 const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
