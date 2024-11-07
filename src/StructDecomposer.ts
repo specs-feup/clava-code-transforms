@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, Type, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { ArrayOfStructsAssignment, DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 
@@ -118,7 +118,7 @@ export class StructDecomposer extends AdvancedTransform {
 
         for (const decl of Query.search(Vardecl)) {
             const type = decl.type;
-            const typeName = type.code.replace("*", "").replace("struct ", "").trim();
+            const typeName = this.simpleType(type);
 
             if (typeName.startsWith(name) && !decl.isParam) {
                 decls.push(decl);
@@ -128,7 +128,6 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private decomposeDeclAndRefs(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
-        this.log(`Decomposing decl: ${decl.code}`);
         // First, decompose the decl
         const fieldDecls = this.decomposeDecl(decl, fields);
 
@@ -238,13 +237,18 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private replaceRef(ref: Varref, fieldDecls: [string, Vardecl][]): void {
-
         // If it's part of a struct-to-struct assignment, decompose it later
         if (ref.getAncestor("vardecl") != null) {
-            this.log(`Ref to ${ref.code} is part of an assignment, decomposing it later`);
+            const decl = ref.getAncestor("vardecl") as Vardecl;
+            const declType = this.simpleType(decl.type);
+            const refType = this.simpleType(ref.type);
+
+            if (declType === refType) {
+                return;
+            }
         }
         // If the varref is a member access, replace it with a ref to the field decl
-        else if (ref.parent instanceof MemberAccess) {
+        if (ref.parent instanceof MemberAccess) {
             this.replaceRefByField(ref, fieldDecls);
         }
         // Varref is a member access in an array of structs, e.g., foo[0].bar
@@ -431,7 +435,7 @@ export class StructDecomposer extends AdvancedTransform {
 
         for (const decl of Query.search(Param)) {
             const type = decl.type;
-            const typeName = type.code.replace("*", "").replace("struct ", "").trim();
+            const typeName = this.simpleType(type);
             const parentFun = decl.getAncestor("function") as FunctionJp;
             const hasParentFunction = parentFun != undefined && parentFun.isImplementation;
 
@@ -478,6 +482,10 @@ export class StructDecomposer extends AdvancedTransform {
         fun.setParams(newFunParams);
 
         return newParams;
+    }
+
+    private simpleType(type: Type): string {
+        return type.code.replace("*", "").replace("struct ", "").trim();
     }
 }
 
