@@ -7,6 +7,9 @@
 #define SIZE4 8
 #define SIZE5 4
 
+int globalA[SIZE1][SIZE2];
+int globalB[SIZE2][SIZE3];
+
 // Function to sum a 1D array
 int sum1DArray(int arr[SIZE1])
 {
@@ -15,6 +18,7 @@ int sum1DArray(int arr[SIZE1])
     {
         sum += arr[i];
     }
+    globalA[2][15] = sum;
     return sum;
 }
 
@@ -26,7 +30,7 @@ int sum2DArray(int arr[SIZE1][SIZE2])
     {
         for (int j = 0; j < SIZE2; j++)
         {
-            sum += arr[i][j];
+            sum += arr[i][j] + globalB[j][i];
             sum += arr[2 * 3 * sum][i * j];
         }
     }
@@ -37,6 +41,7 @@ int sum2DArray(int arr[SIZE1][SIZE2])
         for (int j = 0; j < SIZE2; j++)
         {
             matrix[i][j] = i * arr[i][j];
+            globalA[i][j] = matrix[i][j];
         }
     }
 

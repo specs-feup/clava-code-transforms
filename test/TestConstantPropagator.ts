@@ -3,19 +3,17 @@ import { FoldingPropagationCombiner } from "../src/constfolding/FoldingPropagati
 import { AstDumper } from "./AstDumper.js";
 import { FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 
-function main() {
-    const dumper = new AstDumper();
-    const astDump = dumper.dump();
-    console.log(astDump);
 
-    const funs: string[] = ["intAndInt", "intAndFloat", "kinds"];
+const dumper = new AstDumper();
+const astDump = dumper.dump();
+console.log(astDump);
 
-    const constPropComb = new FoldingPropagationCombiner(false);
-    for (const funName of funs) {
-        const fun = Query.search(FunctionJp, { name: funName }).first()!;
+const funs: string[] = ["intAndInt", "intAndFloat", "kinds"];
 
-        constPropComb.doPassesUntilStop(fun);
-    }
+const constPropComb = new FoldingPropagationCombiner(false);
+for (const funName of funs) {
+    const fun = Query.search(FunctionJp, { name: funName }).first()!;
+
+    constPropComb.doPassesUntilStop(fun);
 }
 
-main();

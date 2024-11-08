@@ -1,12 +1,23 @@
 import { ArrayAccess, Expression, FunctionJp, Joinpoint, Literal, Param, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
-import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
+import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
 export class ArrayFlattener extends AdvancedTransform {
     constructor(silent: boolean = false) {
         super("ArrayFlattener", silent);
+    }
+
+    public flattenAll(): number {
+        let cnt = 0;
+
+        for (const fun of Query.search(FunctionJp)) {
+            cnt += this.flattenAllInFunction(fun);
+        }
+
+        cnt += this.flattenAllGlobals();
+        return cnt;
     }
 
     public flattenAllInFunction(fun: FunctionJp): number {
@@ -32,6 +43,32 @@ export class ArrayFlattener extends AdvancedTransform {
             const cols = this.flattenArrayDecl(arrayDecl);
 
             for (const varref of Query.searchFrom(fun, Varref)) {
+                if (varref.name != arrayDecl.name || !(varref.parent instanceof ArrayAccess)) {
+                    continue;
+                }
+                this.flattenArrayRef(varref, cols);
+            }
+            cnt++;
+        });
+
+        return cnt;
+    }
+
+    public flattenAllGlobals(): number {
+        const arrays: Vardecl[] = [];
+
+        const decls = this.findDecls(Clava.getProgram(), Vardecl);
+        decls.forEach((decl) => {
+            if (decl.isGlobal) {
+                arrays.push(decl);
+            }
+        });
+
+        let cnt = 0;
+        arrays.forEach((arrayDecl) => {
+            const cols = this.flattenArrayDecl(arrayDecl);
+
+            for (const varref of Query.searchFrom(Query.root(), Varref)) {
                 if (varref.name != arrayDecl.name || !(varref.parent instanceof ArrayAccess)) {
                     continue;
                 }
