@@ -1,4 +1,4 @@
-import { ArrayAccess, Expression, FunctionJp, Joinpoint, Literal, Param, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, Expression, FunctionJp, InitList, Joinpoint, Literal, Param, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
@@ -13,10 +13,15 @@ export class ArrayFlattener extends AdvancedTransform {
         let cnt = 0;
 
         for (const fun of Query.search(FunctionJp)) {
-            cnt += this.flattenAllInFunction(fun);
+            const n = this.flattenAllInFunction(fun);
+            this.log(`Flattened ${n} array(s) in function ${fun.name}`);
+            cnt += n;
         }
 
-        cnt += this.flattenAllGlobals();
+        const n = this.flattenAllGlobals();
+        this.log(`Flattened ${n} global array(s)`);
+        cnt += n;
+
         return cnt;
     }
 
@@ -119,6 +124,18 @@ export class ArrayFlattener extends AdvancedTransform {
         }
         else {
             const newDecl = ClavaJoinPoints.varDeclNoInit(decl.name, newTypeJp);
+
+            if (decl.children.length > 0) {
+                if (decl.children[0] instanceof InitList) {
+                    const init = this.getInitList(decl.children[0]);
+                    newDecl.setInit(init);
+                }
+                else {
+                    this.logWarning("Array with initializer not supported, maintaining original initializer");
+                    const init = decl.children[0].copy() as Expression;
+                    newDecl.setInit(init);
+                }
+            }
             decl.replaceWith(newDecl);
         }
         return cols;
@@ -145,5 +162,27 @@ export class ArrayFlattener extends AdvancedTransform {
         //const access = ClavaJoinPoints.arrayAccess(ref, fullExpr);
         const access = ClavaJoinPoints.exprLiteral(`${ref.name}[${fullExpr.code}]`);
         firstArrAccess.replaceWith(access);
+    }
+
+    private getInitList(initList: InitList): InitList {
+        const newList = this.getInitSublist(initList);
+        const newListCode = `{${newList.map((lit) => lit.code).join(", ")}}`;
+
+        const expr = ClavaJoinPoints.exprLiteral(newListCode);
+        return expr as InitList;
+    }
+
+    private getInitSublist(initList: InitList): Literal[] {
+        const newList: Literal[] = [];
+
+        for (const elem of initList.children) {
+            if (elem instanceof InitList) {
+                newList.push(...this.getInitSublist(elem));
+            }
+            else {
+                newList.push(elem as Literal);
+            }
+        }
+        return newList;
     }
 }

@@ -160,7 +160,7 @@ int main()
         0};
     int image_gray[H][W] = {0};
     int temp_buf[H][W] = {0};
-    int filter[K][K] = {0};
+    int filter[K][K] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
     int output[H][W] = {0};
 
     auto start = high_resolution_clock::now();
