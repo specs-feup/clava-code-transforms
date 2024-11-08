@@ -32,10 +32,10 @@ export class ArrayFlattener extends AdvancedTransform {
             const cols = this.flattenArrayDecl(arrayDecl);
 
             for (const varref of Query.searchFrom(fun, Varref)) {
-                if (varref.name != arrayDecl.name) {
+                if (varref.name != arrayDecl.name || !(varref.parent instanceof ArrayAccess)) {
                     continue;
                 }
-                //this.flattenArrayRef(varref, cols);
+                this.flattenArrayRef(varref, cols);
             }
             cnt++;
         });
@@ -88,6 +88,7 @@ export class ArrayFlattener extends AdvancedTransform {
     }
 
     private flattenArrayRef(ref: Varref, cols: number): void {
+        console.log(ref.parent.parent.code);
         const firstArrAccess = ref.parent.parent as ArrayAccess;
         const secondArrAccess = ref.parent as ArrayAccess;
 
@@ -103,9 +104,10 @@ export class ArrayFlattener extends AdvancedTransform {
         const lit = ClavaJoinPoints.integerLiteral(cols);
 
         const mul = ClavaJoinPoints.binaryOp("*", firstExpr, lit);
-        const add = ClavaJoinPoints.binaryOp("+", mul, secondExpr);
+        const fullExpr = ClavaJoinPoints.binaryOp("+", mul, secondExpr);
 
-        const access = ClavaJoinPoints.arrayAccess(ref, add);
+        //const access = ClavaJoinPoints.arrayAccess(ref, fullExpr);
+        const access = ClavaJoinPoints.exprLiteral(`${ref.name}[${fullExpr.code}]`);
         firstArrAccess.replaceWith(access);
     }
 }
