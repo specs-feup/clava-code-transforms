@@ -1,4 +1,4 @@
-import { ArrayAccess, Expression, FunctionJp, Param, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, Expression, FunctionJp, Joinpoint, Literal, Param, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
@@ -10,69 +10,102 @@ export class ArrayFlattener extends AdvancedTransform {
     }
 
     public flattenAllInFunction(fun: FunctionJp): number {
-        for (const param of Query.searchFrom(fun, Param)) {
-            if (!param.type.isArray) {
+        const uniqueArrayIDs: Set<string> = new Set();
+        const arrays: Vardecl[] = [];
+
+        const params = this.findDecls(fun, Param);
+        params.forEach((param) => {
+            uniqueArrayIDs.add(param.astId);
+            arrays.push(param);
+        });
+
+        const decls = this.findDecls(fun, Vardecl);
+        decls.forEach((decl) => {
+            if (!uniqueArrayIDs.has(decl.astId)) {
+                uniqueArrayIDs.add(decl.astId);
+                arrays.push(decl);
+            }
+        });
+
+        let cnt = 0;
+        arrays.forEach((arrayDecl) => {
+            const cols = this.flattenArrayDecl(arrayDecl);
+
+            for (const varref of Query.searchFrom(fun, Varref)) {
+                if (varref.name != arrayDecl.name) {
+                    continue;
+                }
+                //this.flattenArrayRef(varref, cols);
+            }
+            cnt++;
+        });
+
+        return cnt;
+    }
+
+    private findDecls(startPoint: Joinpoint, declType: typeof Vardecl): Vardecl[] {
+        const decls: Vardecl[] = [];
+        for (const decl of Query.searchFrom(startPoint, declType)) {
+            if (!decl.type.isArray) {
                 continue;
             }
-            const type = param.type;
-
+            const type = decl.type;
             if (type.arrayDims.length == 2) {
-                this.flattenParameterArray(fun, param);
+                decls.push(decl);
             }
             if (type.arrayDims.length > 2) {
                 this.logWarning("Array with more than 2 dimensions not supported");
             }
         }
-
-        return 0;
+        return decls;
     }
 
-    private flattenParameterArray(fun: FunctionJp, arrayParam: Param): void {
-        const type = arrayParam.type;
+    private flattenArrayDecl(decl: Vardecl): number {
+        const type = decl.type;
         const dims = type.arrayDims;
 
         const rows = dims[0];
         const cols = dims[1];
 
-        if (rows == -1 || cols == -1) {
+        if (rows == -1 || cols == -1 || Number.isNaN(rows) || Number.isNaN(cols) || rows == undefined || cols == undefined) {
             this.logWarning("Array with unknown dimensions not supported");
-            return;
+            return -1;
         }
         const simpleType = this.simpleType(type);
-        const simpleTypeJp = ClavaJoinPoints.type(simpleType);
 
-        const fullSize = rows * cols;
-        const newTypeJp = ClavaJoinPoints.constArrayType(simpleType, fullSize);
+        const fullSize: number[] = [rows * cols];
+        const newTypeJp = ClavaJoinPoints.constArrayType(simpleType, ...fullSize);
 
-        arrayParam.setType(newTypeJp);
-
-        for (const varref of Query.searchFrom(fun, Varref)) {
-            if (varref.name != arrayParam.name) {
-                continue;
-            }
-            this.flattenArrayRef(varref, cols);
+        if (decl instanceof Param) {
+            const newParam = ClavaJoinPoints.param(decl.name, newTypeJp);
+            decl.replaceWith(newParam);
         }
+        else {
+            const newDecl = ClavaJoinPoints.varDeclNoInit(decl.name, newTypeJp);
+            decl.replaceWith(newDecl);
+        }
+        return cols;
     }
 
     private flattenArrayRef(ref: Varref, cols: number): void {
-        const a1 = ref.parent as ArrayAccess;
-        const a2 = ref.parent.parent as ArrayAccess;
+        const firstArrAccess = ref.parent.parent as ArrayAccess;
+        const secondArrAccess = ref.parent as ArrayAccess;
 
-        const expr1 = a1.children[1] as Expression;
-        const expr2 = a2.children[0] as Expression;
+        let firstExpr = firstArrAccess.children[0] as Expression;
+        let secondExpr = secondArrAccess.children[1] as Expression;
 
-        const parLhs = ClavaJoinPoints.parenthesis(expr1);
-        const parRhs = ClavaJoinPoints.parenthesis(expr2);
+        if (!(firstExpr instanceof Literal) && !(firstExpr instanceof Varref)) {
+            firstExpr = ClavaJoinPoints.parenthesis(firstExpr);
+        }
+        if (!(secondExpr instanceof Literal) && !(secondExpr instanceof Varref)) {
+            secondExpr = ClavaJoinPoints.parenthesis(secondExpr);
+        }
         const lit = ClavaJoinPoints.integerLiteral(cols);
 
-        const mul = ClavaJoinPoints.binaryOp("*", parLhs, lit);
-        const add = ClavaJoinPoints.binaryOp("+", mul, parRhs);
+        const mul = ClavaJoinPoints.binaryOp("*", firstExpr, lit);
+        const add = ClavaJoinPoints.binaryOp("+", mul, secondExpr);
 
         const access = ClavaJoinPoints.arrayAccess(ref, add);
-        a2.replaceWith(access);
-    }
-
-    private flattenLocalArray(fun: FunctionJp, arrayVar: Varref): void {
-
+        firstArrAccess.replaceWith(access);
     }
 }

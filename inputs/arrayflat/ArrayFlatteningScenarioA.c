@@ -30,6 +30,16 @@ int sum2DArray(int arr[SIZE1][SIZE2])
             sum += arr[2 * 3 * sum][i * j];
         }
     }
+
+    double matrix[SIZE1][SIZE2];
+    for (int i = 0; i < SIZE1; i++)
+    {
+        for (int j = 0; j < SIZE2; j++)
+        {
+            matrix[i][j] = i * arr[i][j];
+        }
+    }
+
     return sum;
 }
 
