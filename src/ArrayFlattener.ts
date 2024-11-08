@@ -125,7 +125,6 @@ export class ArrayFlattener extends AdvancedTransform {
     }
 
     private flattenArrayRef(ref: Varref, cols: number): void {
-        console.log(ref.parent.parent.code);
         const firstArrAccess = ref.parent.parent as ArrayAccess;
         const secondArrAccess = ref.parent as ArrayAccess;
 
@@ -140,8 +139,8 @@ export class ArrayFlattener extends AdvancedTransform {
         }
         const lit = ClavaJoinPoints.integerLiteral(cols);
 
-        const mul = ClavaJoinPoints.binaryOp("*", firstExpr, lit);
-        const fullExpr = ClavaJoinPoints.binaryOp("+", mul, secondExpr);
+        const mul = ClavaJoinPoints.binaryOp("*", secondExpr, lit);
+        const fullExpr = ClavaJoinPoints.binaryOp("+", mul, firstExpr);
 
         //const access = ClavaJoinPoints.arrayAccess(ref, fullExpr);
         const access = ClavaJoinPoints.exprLiteral(`${ref.name}[${fullExpr.code}]`);
