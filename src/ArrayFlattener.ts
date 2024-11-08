@@ -1,4 +1,4 @@
-import { ArrayAccess, Expression, FunctionJp, InitList, Joinpoint, Literal, Param, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, Expression, FunctionJp, InitList, Joinpoint, Literal, Param, Program, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
@@ -45,15 +45,8 @@ export class ArrayFlattener extends AdvancedTransform {
 
         let cnt = 0;
         arrays.forEach((arrayDecl) => {
-            const cols = this.flattenArrayDecl(arrayDecl);
-
-            for (const varref of Query.searchFrom(fun, Varref)) {
-                if (varref.name != arrayDecl.name || !(varref.parent instanceof ArrayAccess)) {
-                    continue;
-                }
-                this.flattenArrayRef(varref, cols);
-            }
-            cnt++;
+            const valid = this.flattenArray(arrayDecl, fun);
+            cnt += valid ? 1 : 0;
         });
 
         return cnt;
@@ -71,18 +64,32 @@ export class ArrayFlattener extends AdvancedTransform {
 
         let cnt = 0;
         arrays.forEach((arrayDecl) => {
-            const cols = this.flattenArrayDecl(arrayDecl);
-
-            for (const varref of Query.searchFrom(Query.root(), Varref)) {
-                if (varref.name != arrayDecl.name || !(varref.parent instanceof ArrayAccess)) {
-                    continue;
-                }
-                this.flattenArrayRef(varref, cols);
-            }
-            cnt++;
+            const valid = this.flattenArray(arrayDecl, Clava.getProgram());
+            cnt += valid ? 1 : 0;
         });
 
         return cnt;
+    }
+
+    public flattenArray(decl: Vardecl, region: FunctionJp | Program): boolean {
+        const dims = this.flattenArrayDecl(decl);
+        if (dims[2] == -1) {
+            return false;
+        }
+        const is3D = dims[0] != -1;
+
+        for (const varref of Query.searchFrom(region, Varref)) {
+            if (varref.name != decl.name || !(varref.parent instanceof ArrayAccess)) {
+                continue;
+            }
+            if (!is3D) {
+                this.flatten2DArrayRef(varref, dims[2]);
+            }
+            else {
+                this.flatten3DArrayRef(varref, dims[1], dims[2]);
+            }
+        }
+        return true;
     }
 
     private findDecls(startPoint: Joinpoint, declType: typeof Vardecl): Vardecl[] {
@@ -92,30 +99,40 @@ export class ArrayFlattener extends AdvancedTransform {
                 continue;
             }
             const type = decl.type;
-            if (type.arrayDims.length == 2) {
+            if (type.arrayDims.length == 2 || type.arrayDims.length == 3) {
                 decls.push(decl);
             }
-            if (type.arrayDims.length > 2) {
+            if (type.arrayDims.length > 3) {
                 this.logWarning("Array with more than 2 dimensions not supported");
             }
         }
         return decls;
     }
 
-    private flattenArrayDecl(decl: Vardecl): number {
+    private flattenArrayDecl(decl: Vardecl): [number, number, number] {
         const type = decl.type;
         const dims = type.arrayDims;
 
-        const rows = dims[0];
-        const cols = dims[1];
+        const depth = dims.length == 3 ? dims[0] : -1;
+        const rows = dims.length == 3 ? dims[1] : dims[0];
+        const cols = dims.length == 3 ? dims[2] : dims[1];
 
-        if (rows == -1 || cols == -1 || Number.isNaN(rows) || Number.isNaN(cols) || rows == undefined || cols == undefined) {
-            this.logWarning("Array with unknown dimensions not supported");
-            return -1;
+        if (rows == -1 || cols == -1 || rows == undefined || cols == undefined || Number.isNaN(rows) || Number.isNaN(cols)) {
+            if (dims.length == 2) {
+                this.logWarning(`2D array with dimensions [${rows}][${cols}] not supported`);
+            }
+            else {
+                this.logWarning(`3D array with dimensions [${depth}][${rows}][${cols}] not supported`);
+            }
+            return [-1, -1, -1];
+        }
+        if (depth == -1 && dims.length == 3) {
+            this.logWarning(`3D array with dimensions [${depth}][${rows}][${cols}] not supported`);
+            return [-1, -1, -1];
         }
         const simpleType = this.simpleType(type);
 
-        const fullSize: number[] = [rows * cols];
+        const fullSize: number[] = [rows * cols * (depth == -1 ? 1 : depth)];
         const newTypeJp = ClavaJoinPoints.constArrayType(simpleType, ...fullSize);
 
         if (decl instanceof Param) {
@@ -138,30 +155,64 @@ export class ArrayFlattener extends AdvancedTransform {
             }
             decl.replaceWith(newDecl);
         }
-        return cols;
-    }
+        return [depth, rows, cols];
+    };
 
-    private flattenArrayRef(ref: Varref, cols: number): void {
-        const firstArrAccess = ref.parent.parent as ArrayAccess;
-        const secondArrAccess = ref.parent as ArrayAccess;
+    private flatten2DArrayRef(ref: Varref, cols: number): void {
+        const rowArrayAccess = ref.parent.parent as ArrayAccess;
+        const colArrayAccess = ref.parent as ArrayAccess;
 
-        let firstExpr = firstArrAccess.children[0] as Expression;
-        let secondExpr = secondArrAccess.children[1] as Expression;
+        let rowExpr = rowArrayAccess.children[0] as Expression;
+        let colExpr = colArrayAccess.children[1] as Expression;
 
-        if (!(firstExpr instanceof Literal) && !(firstExpr instanceof Varref)) {
-            firstExpr = ClavaJoinPoints.parenthesis(firstExpr);
+        if (!(rowExpr instanceof Literal) && !(rowExpr instanceof Varref)) {
+            rowExpr = ClavaJoinPoints.parenthesis(rowExpr);
         }
-        if (!(secondExpr instanceof Literal) && !(secondExpr instanceof Varref)) {
-            secondExpr = ClavaJoinPoints.parenthesis(secondExpr);
+        if (!(colExpr instanceof Literal) && !(colExpr instanceof Varref)) {
+            colExpr = ClavaJoinPoints.parenthesis(colExpr);
         }
-        const lit = ClavaJoinPoints.integerLiteral(cols);
 
-        const mul = ClavaJoinPoints.binaryOp("*", secondExpr, lit);
-        const fullExpr = ClavaJoinPoints.binaryOp("+", mul, firstExpr);
+        const litCols = ClavaJoinPoints.integerLiteral(cols);
+
+        const mul = ClavaJoinPoints.binaryOp("*", rowExpr, litCols);
+        const fullExpr = ClavaJoinPoints.binaryOp("+", mul, colExpr);
 
         //const access = ClavaJoinPoints.arrayAccess(ref, fullExpr);
         const access = ClavaJoinPoints.exprLiteral(`${ref.name}[${fullExpr.code}]`);
-        firstArrAccess.replaceWith(access);
+        rowArrayAccess.replaceWith(access);
+    }
+
+    private flatten3DArrayRef(ref: Varref, rows: number, cols: number): void {
+        const depthArrayyAccess = ref.parent.parent.parent as ArrayAccess
+        const rowArrayyAccess = ref.parent.parent as ArrayAccess;
+        const colArrayyAccess = ref.parent as ArrayAccess;
+
+        let depthExpr = depthArrayyAccess.children[0] as Expression;
+        let rowExpr = rowArrayyAccess.children[1] as Expression;
+        let colExpr = colArrayyAccess.children[1] as Expression;
+
+        if (!(depthExpr instanceof Literal) && !(depthExpr instanceof Varref)) {
+            depthExpr = ClavaJoinPoints.parenthesis(depthExpr);
+        }
+        if (!(rowExpr instanceof Literal) && !(rowExpr instanceof Varref)) {
+            rowExpr = ClavaJoinPoints.parenthesis(rowExpr);
+        }
+        if (!(colExpr instanceof Literal) && !(colExpr instanceof Varref)) {
+            colExpr = ClavaJoinPoints.parenthesis(colExpr);
+        }
+
+        const litCols = ClavaJoinPoints.integerLiteral(cols);
+        const litRows = ClavaJoinPoints.integerLiteral(rows);
+
+        const mul1 = ClavaJoinPoints.binaryOp("*", litRows, litRows);
+        const mul2 = ClavaJoinPoints.binaryOp("*", depthExpr!, mul1);
+        const mul3 = ClavaJoinPoints.binaryOp("*", rowExpr, litCols);
+        const sum1 = ClavaJoinPoints.binaryOp("+", mul2, colExpr);
+        const fullExpr = ClavaJoinPoints.binaryOp("+", mul3, sum1);
+
+        //const access = ClavaJoinPoints.arrayAccess(ref, fullExpr);
+        const access = ClavaJoinPoints.exprLiteral(`${ref.name}[${fullExpr.code}]`);
+        depthArrayyAccess.replaceWith(access);
     }
 
     private getInitList(initList: InitList): InitList {

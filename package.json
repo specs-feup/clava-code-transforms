@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "docs": "typedoc",
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
-    "test:arrayflat-constprop": "clava dist/test/TestFlatteningConstant.js -- clang inputs/edgedetect/",
+    "test:arrayflat-constprop": "clava dist/test/TestFlatteningConstant.js -- clang inputs/optical-flow/",
     "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
     "test:outliner": "clava dist/test/TestOutliner.js -- clang inputs/outlining/",

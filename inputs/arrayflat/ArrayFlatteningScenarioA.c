@@ -48,6 +48,22 @@ int sum2DArray(int arr[SIZE1][SIZE2])
     return sum;
 }
 
+int sum3DArray(int arr3d[SIZE1][SIZE2][SIZE3])
+{
+    int sum = 0;
+    for (int i = 0; i < SIZE1; i++)
+    {
+        for (int j = 0; j < SIZE2; j++)
+        {
+            for (int k = 0; k < SIZE3; k++)
+            {
+                sum += arr3d[i][j][k];
+            }
+        }
+    }
+    return sum;
+}
+
 int main()
 {
     int arr1D[SIZE1];
