@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { BinaryOp, BoolLiteral, FloatLiteral, FunctionJp, IntLiteral, Literal, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, BoolLiteral, FloatLiteral, FunctionJp, IntLiteral, Literal, ParenExpr, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 
 export abstract class ConstantFolder extends AdvancedTransform {
@@ -68,13 +68,14 @@ export abstract class ConstantFolder extends AdvancedTransform {
 
         const newLit = this.doOperation(op.kind, n1, n2, isFloat);
 
-        if (newLit == null) {
-            return false;
-        }
-        else {
+        if (newLit != null) {
             op.replaceWith(newLit);
-            return true;
+
+            if (newLit.parent instanceof ParenExpr && newLit.parent.children.length == 1) {
+                newLit.parent.replaceWith(newLit);
+            }
         }
+        return newLit != null;
     }
 
     private doOperation(kind: string, n1: number, n2: number, isFloat: boolean): Literal | null {
