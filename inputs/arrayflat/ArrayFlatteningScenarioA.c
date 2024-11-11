@@ -64,6 +64,19 @@ int sum3DArray(int arr3d[SIZE1][SIZE2][SIZE3])
     return sum;
 }
 
+void subaccess1D(int bar[SIZE2]) {}
+void subaccess2D(int bar[SIZE2][SIZE2]) {}
+
+void subaccess()
+{
+    int array2D[SIZE2][SIZE2];
+    int array3D[SIZE2][SIZE2][SIZE2];
+
+    subaccess1D(array2D[1]);
+    subaccess1D(array3D[1][1]);
+    subaccess2D(array3D[1]);
+}
+
 int main()
 {
     int arr1D[SIZE1];

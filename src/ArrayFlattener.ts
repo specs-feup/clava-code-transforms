@@ -72,6 +72,13 @@ export class ArrayFlattener extends AdvancedTransform {
     }
 
     public flattenArray(decl: Vardecl, region: FunctionJp | Program): boolean {
+        if (decl.children.length > 0) {
+            if (!(decl.children[0] instanceof InitList) && decl.children[0] instanceof Expression) {
+                this.logWarning("Array with redundant Expression initializer found, removing the expression");
+                decl.removeChildren();
+            }
+        }
+
         const dims = this.flattenArrayDecl(decl);
         if (dims[2] == -1) {
             return false;
