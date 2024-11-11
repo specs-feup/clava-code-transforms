@@ -103,6 +103,10 @@ export class FunctionConstantPropagator extends AdvancedTransform implements Pro
         let replacements = 0;
 
         const body = this.fun.body;
+        if (body == null) {
+            return replacements;
+        }
+
         for (const stmt of body.stmts) {
             if (this.isSimpleAssignment(stmt)) {
                 const region = this.getPostAssignmentRegion(stmt, body.stmts);
