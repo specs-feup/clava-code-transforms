@@ -159,17 +159,16 @@ export class ArrayFlattener extends AdvancedTransform {
     };
 
     private flatten2DArrayRef(ref: Varref, cols: number): void {
-        const rowArrayAccess = ref.parent.parent as ArrayAccess;
-        const colArrayAccess = ref.parent as ArrayAccess;
-
-        let rowExpr = rowArrayAccess.children[0] as Expression;
-        let colExpr = colArrayAccess.children[1] as Expression;
-
-        if (!(rowExpr instanceof Literal) && !(rowExpr instanceof Varref)) {
-            rowExpr = ClavaJoinPoints.parenthesis(rowExpr);
-        }
+        const colAccess = ref.parent.parent as ArrayAccess;
+        let colExpr = colAccess.children[0] as Expression;
         if (!(colExpr instanceof Literal) && !(colExpr instanceof Varref)) {
             colExpr = ClavaJoinPoints.parenthesis(colExpr);
+        }
+
+        const rowArrayAccess = ref.parent as ArrayAccess;
+        let rowExpr = rowArrayAccess.children[1] as Expression;
+        if (!(rowExpr instanceof Literal) && !(rowExpr instanceof Varref)) {
+            rowExpr = ClavaJoinPoints.parenthesis(rowExpr);
         }
 
         const litCols = ClavaJoinPoints.integerLiteral(cols);
@@ -179,40 +178,41 @@ export class ArrayFlattener extends AdvancedTransform {
 
         //const access = ClavaJoinPoints.arrayAccess(ref, fullExpr);
         const access = ClavaJoinPoints.exprLiteral(`${ref.name}[${fullExpr.code}]`);
-        rowArrayAccess.replaceWith(access);
+        colAccess.replaceWith(access);
     }
 
     private flatten3DArrayRef(ref: Varref, rows: number, cols: number): void {
-        const depthArrayyAccess = ref.parent.parent.parent as ArrayAccess
-        const rowArrayyAccess = ref.parent.parent as ArrayAccess;
-        const colArrayyAccess = ref.parent as ArrayAccess;
-
-        let depthExpr = depthArrayyAccess.children[0] as Expression;
-        let rowExpr = rowArrayyAccess.children[1] as Expression;
-        let colExpr = colArrayyAccess.children[1] as Expression;
-
-        if (!(depthExpr instanceof Literal) && !(depthExpr instanceof Varref)) {
-            depthExpr = ClavaJoinPoints.parenthesis(depthExpr);
+        const colAccess = ref.parent.parent.parent as ArrayAccess
+        let colExpr = colAccess.children[0] as Expression;
+        if (!(colExpr instanceof Literal) && !(colExpr instanceof Varref)) {
+            colExpr = ClavaJoinPoints.parenthesis(colExpr);
         }
+
+        const rowAccess = ref.parent.parent as ArrayAccess;
+        let rowExpr = rowAccess.children[0] as Expression;
         if (!(rowExpr instanceof Literal) && !(rowExpr instanceof Varref)) {
             rowExpr = ClavaJoinPoints.parenthesis(rowExpr);
         }
-        if (!(colExpr instanceof Literal) && !(colExpr instanceof Varref)) {
-            colExpr = ClavaJoinPoints.parenthesis(colExpr);
+
+        const depthAccess = ref.parent as ArrayAccess;
+        let depthExpr = depthAccess.children[1] as Expression;
+        if (!(depthExpr instanceof Literal) && !(depthExpr instanceof Varref)) {
+            depthExpr = ClavaJoinPoints.parenthesis(depthExpr);
         }
 
         const litCols = ClavaJoinPoints.integerLiteral(cols);
         const litRows = ClavaJoinPoints.integerLiteral(rows);
 
-        const mul1 = ClavaJoinPoints.binaryOp("*", litRows, litRows);
-        const mul2 = ClavaJoinPoints.binaryOp("*", depthExpr!, mul1);
-        const mul3 = ClavaJoinPoints.binaryOp("*", rowExpr, litCols);
-        const sum1 = ClavaJoinPoints.binaryOp("+", mul2, colExpr);
-        const fullExpr = ClavaJoinPoints.binaryOp("+", mul3, sum1);
+        // index=depth×(num_rows×num_columns)+rows×num_columns+columns
+        const numRowsNumCols = ClavaJoinPoints.binaryOp("*", litRows, litCols);
+        const parenRowsCols = ClavaJoinPoints.parenthesis(numRowsNumCols);
+        const depthMul = ClavaJoinPoints.binaryOp("*", depthExpr, parenRowsCols);
+        const rowsNumCols = ClavaJoinPoints.binaryOp("*", rowExpr, litCols);
+        const sum1 = ClavaJoinPoints.binaryOp("+", depthMul, rowsNumCols);
+        const fullExpr = ClavaJoinPoints.binaryOp("+", sum1, colExpr);
 
-        //const access = ClavaJoinPoints.arrayAccess(ref, fullExpr);
         const access = ClavaJoinPoints.exprLiteral(`${ref.name}[${fullExpr.code}]`);
-        depthArrayyAccess.replaceWith(access);
+        colAccess.replaceWith(access);
     }
 
     private getInitList(initList: InitList): InitList {
