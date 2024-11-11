@@ -83,17 +83,34 @@ export class ArrayFlattener extends AdvancedTransform {
         if (dims[2] == -1) {
             return false;
         }
-        const is3D = dims[0] != -1;
+        const is2D = dims[0] == -1;
 
         for (const varref of Query.searchFrom(region, Varref)) {
             if (varref.name != decl.name || !(varref.parent instanceof ArrayAccess)) {
                 continue;
             }
-            if (!is3D) {
-                this.flatten2DArrayRef(varref, dims[2]);
+            const has3subscripts = varref.parent.parent.parent instanceof ArrayAccess;
+            const has2subscripts = varref.parent.parent instanceof ArrayAccess;
+            const has1subscript = varref.parent instanceof ArrayAccess;
+
+            if (is2D) {
+                if (has2subscripts && has1subscript) {
+                    this.flatten2DArrayRef(varref, dims[2]);
+                }
+                else if (has1subscript) {
+                    this.flatten2DSubArrayRef(varref, dims[2]);
+                }
             }
             else {
-                this.flatten3DArrayRef(varref, dims[1], dims[2]);
+                if (has3subscripts && has2subscripts && has1subscript) {
+                    this.flatten3DArrayRef(varref, dims[1], dims[2]);
+                }
+                else if (has2subscripts && has1subscript) {
+                    this.flatten3DSubArrayRef(varref, dims[1], dims[2]);
+                }
+                else if (has1subscript) {
+                    this.flatten3DSubMatrixRef(varref, dims[1], dims[2]);
+                }
             }
         }
         return true;
@@ -220,6 +237,75 @@ export class ArrayFlattener extends AdvancedTransform {
 
         const access = ClavaJoinPoints.exprLiteral(`${ref.name}[${fullExpr.code}]`);
         colAccess.replaceWith(access);
+    }
+
+    private flatten2DSubArrayRef(ref: Varref, cols: number): void {
+        const rowAccess = ref.parent as ArrayAccess;
+        let rowExpr = rowAccess.children[1] as Expression;
+        if (!(rowExpr instanceof Literal) && !(rowExpr instanceof Varref)) {
+            rowExpr = ClavaJoinPoints.parenthesis(rowExpr);
+        }
+
+        const colsLit = ClavaJoinPoints.integerLiteral(cols);
+        const mul = ClavaJoinPoints.binaryOp("*", rowExpr, colsLit);
+
+        const pointerVarref = ClavaJoinPoints.varRef(ref.name, ref.type);
+        const pointerSum = ClavaJoinPoints.binaryOp("+", pointerVarref, mul);
+        const parenExpr = ClavaJoinPoints.parenthesis(pointerSum);
+
+        rowAccess.replaceWith(parenExpr);
+    }
+
+    private flatten3DSubArrayRef(ref: Varref, rows: number, cols: number): void {
+        const depthAccess = ref.parent as ArrayAccess;
+        let depthExpr = depthAccess.children[1] as Expression;
+        if (!(depthExpr instanceof Literal) && !(depthExpr instanceof Varref)) {
+            depthExpr = ClavaJoinPoints.parenthesis(depthExpr);
+        }
+
+        const rowAccess = ref.parent.parent as ArrayAccess;
+        let rowExpr = rowAccess.children[0] as Expression;
+        if (!(rowExpr instanceof Literal) && !(rowExpr instanceof Varref)) {
+            rowExpr = ClavaJoinPoints.parenthesis(rowExpr);
+        }
+
+        const colsLit = ClavaJoinPoints.integerLiteral(cols);
+        const rowsLit = ClavaJoinPoints.integerLiteral(rows);
+
+        // addr = base + depth × (num_rows × num_columns) + rows × num_columns 
+        const numRowsNumCols = ClavaJoinPoints.binaryOp("*", rowsLit, colsLit);
+        const parenRowsCols = ClavaJoinPoints.parenthesis(numRowsNumCols);
+        const depthMul = ClavaJoinPoints.binaryOp("*", depthExpr, parenRowsCols);
+        const rowsNumCols = ClavaJoinPoints.binaryOp("*", rowExpr, colsLit);
+        const sum = ClavaJoinPoints.binaryOp("+", depthMul, rowsNumCols);
+
+        const pointerVarref = ClavaJoinPoints.varRef(ref.name, ref.type);
+        const pointerSum = ClavaJoinPoints.binaryOp("+", pointerVarref, sum);
+        const parenExpr = ClavaJoinPoints.parenthesis(pointerSum);
+
+        rowAccess.replaceWith(parenExpr);
+    }
+
+    private flatten3DSubMatrixRef(ref: Varref, rows: number, cols: number): void {
+        const depthAccess = ref.parent as ArrayAccess;
+        let depthExpr = depthAccess.children[1] as Expression;
+        if (!(depthExpr instanceof Literal) && !(depthExpr instanceof Varref)) {
+            depthExpr = ClavaJoinPoints.parenthesis(depthExpr);
+        }
+
+        const colsLit = ClavaJoinPoints.integerLiteral(cols);
+        const rowsLit = ClavaJoinPoints.integerLiteral(rows);
+
+        // addr = base + depth × (num_rows × num_columns)
+        const numRowsNumCols = ClavaJoinPoints.binaryOp("*", rowsLit, colsLit);
+        const parenRowsCols = ClavaJoinPoints.parenthesis(numRowsNumCols);
+        const depthMul = ClavaJoinPoints.binaryOp("*", depthExpr, parenRowsCols);
+
+        const pointerVarref = ClavaJoinPoints.varRef(ref.name, ref.type);
+        const pointerSum = ClavaJoinPoints.binaryOp("+", pointerVarref, depthMul);
+        const parenExpr = ClavaJoinPoints.parenthesis(pointerSum);
+
+        depthAccess.replaceWith(parenExpr);
     }
 
     private getInitList(initList: InitList): InitList {
