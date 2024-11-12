@@ -1,8 +1,9 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, Type, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
-import { ArrayOfStructsAssignment, DirectListAssignment, MallocAssignment, PointerListAssignment, StructAssignmentDecomposer, StructToStructAssignment } from "./StructAssignmentDecomp.js";
+import { ArrayOfStructsAssignment, DirectListAssignment, MallocAssignment, PointerListAssignment, StructDeclDecomposer, StructToStructAssignment } from "./StructDeclDecomposer.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
+import { ArrayToArrayAssignment, DerefToScalarAssignment, PointerToPointerAssignment, PointerToScalarAssignment, ScalarToScalarAssignment } from "./StructRefDecomposer.js";
 
 export class StructDecomposer extends AdvancedTransform {
     constructor(silent: boolean = false) {
@@ -16,14 +17,14 @@ export class StructDecomposer extends AdvancedTransform {
         const classes = this.findAllStructlikeClasses();
         this.log(`Found ${classes.length} structs aliased as classes`);
 
+        const totalStructs = [
+            ...structs,
+            ...classes
+        ];
         const decompNames: string[] = [];
 
-        structs.forEach(([name, struct]) => {
+        totalStructs.forEach(([name, struct]) => {
             this.decompose(struct.fields, name);
-            decompNames.push(name);
-        });
-        classes.forEach(([name, classJp]) => {
-            this.decompose(classJp.fields, name);
             decompNames.push(name);
         });
 
@@ -31,13 +32,18 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     public decomposeByName(name: string): void {
-        for (const struct of Query.search(Struct)) {
-            const structName = this.getStructName(struct);
+        const structs = [
+            ...this.findAllStructs(),
+            ...this.findAllStructlikeClasses()
+        ];
+        structs.forEach((elem) => {
+            const elemName = elem[0];
+            const elemStruct = elem[1];
 
-            if (structName === name) {
-                this.decompose(struct.fields, name);
+            if (elemName === name) {
+                this.decompose(elemStruct.fields, name);
             }
-        }
+        });
     }
 
     public decomposeStruct(struct: Struct): void {
@@ -219,7 +225,7 @@ export class StructDecomposer extends AdvancedTransform {
     private createNewVarsWithInit(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
         let initVars: [string, Vardecl][] = [];
 
-        const decomposers: StructAssignmentDecomposer[] = [
+        const decomposers: StructDeclDecomposer[] = [
             new DirectListAssignment(),
             new PointerListAssignment(),
             new MallocAssignment(),
@@ -237,11 +243,6 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private replaceRef(ref: Varref, fieldDecls: [string, Vardecl][]): void {
-        if (ref.code == "output") {
-            console.log(ref.parent.joinPointType);
-            console.log(ref.parent.parent.joinPointType);
-            console.log(ref.parent.parent.parent.joinPointType);
-        }
         // If it's part of a decl struct-to-struct assignment, decompose it later
         if (ref.getAncestor("vardecl") != null) {
             const decl = ref.getAncestor("vardecl") as Vardecl;
@@ -271,7 +272,19 @@ export class StructDecomposer extends AdvancedTransform {
                 this.replaceStructToStructAssignment(leftRef, rightRef, fieldDecls);
 
                 binaryOp.parent.detach();
+                return;
             }
+        }
+        // Struct-to-struct assignment using operator=
+        const parentCall = ref.getAncestor("call") == null ? null : ref.getAncestor("call") as Call;
+        if (parentCall != null && parentCall.name.includes("operator=")) {
+            const leftRef = Query.searchFromInclusive(parentCall.args[0], Varref).first() as Varref;
+            const rightRef = Query.searchFromInclusive(parentCall.args[1], Varref).first() as Varref;
+
+            this.replaceStructToStructAssignment(leftRef, rightRef, fieldDecls);
+
+            //parentCall.detach();
+            return;
         }
         // Struct passed as argument to a function, e.g., doSomething(bar)
         else if (ref.isFunctionArgument) {
@@ -311,88 +324,24 @@ export class StructDecomposer extends AdvancedTransform {
     }
 
     private replaceStructToStructAssignment(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][]): void {
-        const rhsIsDeref = rightRef.parent instanceof UnaryOp && rightRef.parent.kind === "deref";
-        const rhsIsAddrOf = rightRef.parent instanceof UnaryOp && rightRef.parent.kind === "addr_of";
-        const rhsIsPointer = rightRef.type.isPointer;
-        const lhsIsPointer = leftRef.type.isPointer;
-        const lhsIsArray = leftRef.parent instanceof ArrayAccess;
-        const rhsIsArray = rightRef.parent instanceof ArrayAccess;
-
         const newExprs: Statement[] = [];
 
-        for (const [fieldName, fieldDecl] of fieldDecls) {
-            const lhsVarName = `${leftRef.name}_${fieldName}`;
-            const rhsVarName = `${rightRef.name}_${fieldName}`;
+        const decomposers = [
+            new ScalarToScalarAssignment(),
+            new ArrayToArrayAssignment(),
+            new PointerToScalarAssignment(),
+            new PointerToPointerAssignment(),
+            new DerefToScalarAssignment()
+        ];
 
-            // foo = bar
-            if (!lhsIsPointer && !rhsIsPointer && !lhsIsArray && !rhsIsArray) {
-                if (fieldDecl.type.isArray) {
-                    const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
-                    const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
-                    const sizeof = ClavaJoinPoints.integerLiteral(fieldDecl.type.arraySize);
-                    const retType = ClavaJoinPoints.type("void*");
-                    const call = ClavaJoinPoints.callFromName("memcpy", retType, newLhs, newRhs, sizeof);
-                    const stmt = ClavaJoinPoints.exprStmt(call);
-
-                    newExprs.push(stmt);
-                }
-                else {
-                    const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
-                    const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
-                    const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
-                    const stmt = ClavaJoinPoints.exprStmt(assign);
-
-                    newExprs.push(stmt);
-                }
-            }
-            if (!lhsIsPointer && !rhsIsPointer && lhsIsArray && rhsIsArray) {
-                const lhsArrayAccess = leftRef.parent as ArrayAccess;
-                const newLhsVar = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
-                const newLhs = lhsArrayAccess.copy() as ArrayAccess;
-                newLhs.setFirstChild(newLhsVar);
-
-                const rhsArrayAccess = rightRef.parent as ArrayAccess;
-                const newRhsVar = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
-                const newRhs = rhsArrayAccess.copy() as ArrayAccess;
-                newRhs.setFirstChild(newRhsVar);
-
-                const binOp = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
-                const stmt = ClavaJoinPoints.exprStmt(binOp);
-
-                newExprs.push(stmt);
-            }
-            // foo = *bar
-            else if (!lhsIsPointer && rhsIsPointer && rhsIsDeref) {
-                const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
-                const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
-                const newRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
-                const deref = ClavaJoinPoints.unaryOp("*", newRhs);
-                const assign = ClavaJoinPoints.binaryOp("=", newLhs, deref);
-                const stmt = ClavaJoinPoints.exprStmt(assign);
-
-                newExprs.push(stmt);
-            }
-            else if (lhsIsPointer && rhsIsPointer) {
-                const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
-                const newRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
-                const newLhs = ClavaJoinPoints.varRef(lhsVarName, pointerType);
-                const assign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
-                const stmt = ClavaJoinPoints.exprStmt(assign);
-
-                newExprs.push(stmt);
-            }
-            // foo = &bar, where foo is a pointer and bar is not
-            else if (lhsIsPointer && !rhsIsPointer && rhsIsAddrOf) {
-                const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
-                const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
-                const addrOf = ClavaJoinPoints.unaryOp("&", newRhs);
-                const newLhs = ClavaJoinPoints.varRef(lhsVarName, pointerType);
-                const assign = ClavaJoinPoints.binaryOp("=", newLhs, addrOf);
-                const stmt = ClavaJoinPoints.exprStmt(assign);
-
-                newExprs.push(stmt);
+        for (const decomposer of decomposers) {
+            if (decomposer.validate(leftRef, rightRef)) {
+                const fieldExprs = decomposer.decompose(leftRef, rightRef, fieldDecls);
+                newExprs.push(...fieldExprs);
+                break;
             }
         }
+
         for (const expr of newExprs) {
             leftRef.parent.insertAfter(expr);
         }
@@ -400,16 +349,16 @@ export class StructDecomposer extends AdvancedTransform {
 
     private replaceArrayRefByField(ref: Varref, fieldDecls: [string, Vardecl][]): void {
         const arrayAccess = ref.parent as ArrayAccess;
+        const arrayIndex = arrayAccess.children[1].copy() as Expression;
         const memberAccess = ref.parent.getAncestor("memberAccess") as MemberAccess;
 
         const fieldName = memberAccess.name;
         const fieldArray = fieldDecls.find(([name, _]) => name === fieldName)![1];
 
-        const arrayAccessCopy = arrayAccess.copy();
-        const newVarref = ClavaJoinPoints.varRef(fieldArray);
-        arrayAccessCopy.setFirstChild(newVarref);
+        const newVar = fieldArray.varref();
+        const arrAccess = ClavaJoinPoints.arrayAccess(newVar, arrayIndex);
 
-        memberAccess.replaceWith(arrayAccessCopy);
+        memberAccess.replaceWith(arrAccess);
     }
 
     private replaceRefArg(ref: Varref, fieldDecls: [string, Vardecl][]): void {

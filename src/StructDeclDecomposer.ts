@@ -1,9 +1,8 @@
-import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import { ArrayType, BinaryOp, Call, Cast, Expression, ExprStmt, Field, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
-export interface StructAssignmentDecomposer {
+export interface StructDeclDecomposer {
     validate(decl: Vardecl): boolean;
     decompose(decl: Vardecl, fields: Field[]): [string, Vardecl][];
 }
@@ -23,7 +22,7 @@ export interface StructAssignmentDecomposer {
  * Data dataInit4 = {5}
  * Data dataInit5 = {.id = 105}
  */
-export class DirectListAssignment implements StructAssignmentDecomposer {
+export class DirectListAssignment implements StructDeclDecomposer {
     validate(decl: Vardecl): boolean {
         const cond1 = decl.children.length != 1;
         const cond2 = decl.type.isArray;
@@ -80,7 +79,7 @@ export class DirectListAssignment implements StructAssignmentDecomposer {
  * Data *dataInit9 = &(Data){109}
  * Data *dataInit10 = &(Data){.id = 110}
  */
-export class PointerListAssignment implements StructAssignmentDecomposer {
+export class PointerListAssignment implements StructDeclDecomposer {
     validate(decl: Vardecl): boolean {
         try {
             const cond1 = decl.children.length === 1;
@@ -151,7 +150,7 @@ export class PointerListAssignment implements StructAssignmentDecomposer {
  * Data *dataInit15 = (Data *) calloc(1, sizeof(Data))
  * 
  */
-export class MallocAssignment implements StructAssignmentDecomposer {
+export class MallocAssignment implements StructDeclDecomposer {
     validate(decl: Vardecl): boolean {
         const cond1 = decl.children.length === 1;
         if (!cond1) {
@@ -257,7 +256,7 @@ export class MallocAssignment implements StructAssignmentDecomposer {
     }
 }
 
-export class StructToStructAssignment implements StructAssignmentDecomposer {
+export class StructToStructAssignment implements StructDeclDecomposer {
     validate(decl: Vardecl): boolean {
         if (decl.children.length !== 1) {
             return false;
@@ -332,7 +331,7 @@ export class StructToStructAssignment implements StructAssignmentDecomposer {
     }
 }
 
-export class ArrayOfStructsAssignment implements StructAssignmentDecomposer {
+export class ArrayOfStructsAssignment implements StructDeclDecomposer {
     validate(decl: Vardecl): boolean {
         const isArray = decl.type.isArray;
         if (!isArray) {
