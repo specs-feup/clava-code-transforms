@@ -221,7 +221,7 @@ outliner.outlineWithName(start, end, "region");
 
 ### Struct decomposition
 
-Decomposes a struct variable/ref into separate variables/refs representing their fields, updating function calls and all expressions accordingly:
+Decomposes a struct variable/ref into separate variables/refs representing their fields, updating function calls and all expressions accordingly. If you use arrays of structs, you must ensure they are 1D (i.e., run the Array Flattening transformation beforehand if you need to):
 
 ```C
 typedef struct {
@@ -235,8 +235,11 @@ void bar(Point2D *point)  { /*...*/ }
 
 int main() {
     Point2D point;
-    point.x = 1.0;
-    point.y = 2.0;
+    Point2D points[2] = {1.0, 2.0, 3.0, 4.0};
+
+    point.x = 40.0;
+    points[1].y = 50.0
+
     foo(point);
     bar(&point);
 }
@@ -249,6 +252,12 @@ void bar(float *point_x, float *point_y) { /*...*/ }
 int main() {
     float point_x = 1.0;
     float point_y = 2.0;
+    float point_x[2] = {1.0, 3.0};
+    float point_y[2] = {2.0, 4.0};
+
+    point_x = 40.0;
+    points_y[1] = 50.0;
+
     foo(point_x, point_y);
     bar(&point_x, &point_y);
 }
