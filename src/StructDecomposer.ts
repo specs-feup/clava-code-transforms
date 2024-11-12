@@ -1,7 +1,7 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, Type, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
-import { ArrayOfStructsAssignment, DirectListAssignment, MallocAssignment, PointerListAssignment, StructDeclDecomposer, StructToStructAssignment } from "./StructDeclDecomposer.js";
+import { ArrayOfStructsDecl, DirectListDecl, MallocDecl, PointerListDecl, StructDeclDecomposer, StructToStructDecl } from "./StructDeclDecomposer.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 import { ArrayToArrayAssignment, DerefToScalarAssignment, PointerToPointerAssignment, PointerToScalarAssignment, ScalarToScalarAssignment } from "./StructRefDecomposer.js";
 
@@ -226,11 +226,11 @@ export class StructDecomposer extends AdvancedTransform {
         let initVars: [string, Vardecl][] = [];
 
         const decomposers: StructDeclDecomposer[] = [
-            new DirectListAssignment(),
-            new PointerListAssignment(),
-            new MallocAssignment(),
-            new StructToStructAssignment(),
-            new ArrayOfStructsAssignment()
+            new DirectListDecl(),
+            new PointerListDecl(),
+            new MallocDecl(),
+            new StructToStructDecl(),
+            new ArrayOfStructsDecl()
         ];
         for (const decomposer of decomposers) {
             if (decomposer.validate(decl)) {
