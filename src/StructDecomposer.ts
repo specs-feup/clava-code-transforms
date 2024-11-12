@@ -3,7 +3,7 @@ import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, Type, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { ArrayOfStructsDecl, DirectListDecl, MallocDecl, PointerListDecl, StructDeclDecomposer, StructToStructDecl } from "./StructDeclDecomposer.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
-import { ArrayToArrayAssignment, DerefToScalarAssignment, PointerToPointerAssignment, PointerToScalarAssignment, ScalarToScalarAssignment } from "./StructRefDecomposer.js";
+import { ArrayToArrayAssignment, DerefToScalarAssignment, PointerToPointerAssignment, PointerToScalarAssignment, ScalarToScalarAssignment, StructToArrayPositionAssignment } from "./StructRefDecomposer.js";
 
 export class StructDecomposer extends AdvancedTransform {
     constructor(silent: boolean = false) {
@@ -278,8 +278,8 @@ export class StructDecomposer extends AdvancedTransform {
         // Struct-to-struct assignment using operator=
         const parentCall = ref.getAncestor("call") == null ? null : ref.getAncestor("call") as Call;
         if (parentCall != null && parentCall.name.includes("operator=")) {
-            const leftRef = Query.searchFromInclusive(parentCall.args[0], Varref).first() as Varref;
-            const rightRef = Query.searchFromInclusive(parentCall.args[1], Varref).first() as Varref;
+            const leftRef = Query.searchFromInclusive(parentCall.args[1], Varref).first() as Varref;
+            const rightRef = Query.searchFromInclusive(parentCall.args[0], Varref).first() as Varref;
 
             this.replaceStructToStructAssignment(leftRef, rightRef, fieldDecls);
 
@@ -331,7 +331,8 @@ export class StructDecomposer extends AdvancedTransform {
             new ArrayToArrayAssignment(),
             new PointerToScalarAssignment(),
             new PointerToPointerAssignment(),
-            new DerefToScalarAssignment()
+            new DerefToScalarAssignment(),
+            new StructToArrayPositionAssignment()
         ];
 
         for (const decomposer of decomposers) {
@@ -340,6 +341,11 @@ export class StructDecomposer extends AdvancedTransform {
                 newExprs.push(...fieldExprs);
                 break;
             }
+        }
+
+        if (newExprs.length == 0) {
+            this.logWarning(`Could not decompose struct assignment with l-value ${leftRef.code} and r-value ${rightRef.code}`);
+            return;
         }
 
         for (const expr of newExprs) {

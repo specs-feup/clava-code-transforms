@@ -150,3 +150,26 @@ export class DerefToScalarAssignment extends StructRefDecomposer {
         return [stmt];
     }
 }
+
+export class StructToArrayPositionAssignment extends StructRefDecomposer {
+    public validate(leftRef: Varref, rightRef: Varref): boolean {
+        const lhsIsPointer = leftRef.type.isPointer;
+        const rhsIsPointer = rightRef.type.isPointer;
+        const lhsIsArray = leftRef.type.isArray;
+        const rhsIsArray = rightRef.type.isArray;
+
+        console.log("lhs: ", leftRef.code);
+        console.log("rhs: ", rightRef.code);
+        console.log("lhsIsPointer", lhsIsPointer);
+        console.log("rhsIsPointer", rhsIsPointer);
+        console.log("lhsIsArray", lhsIsArray);
+        console.log("rhsIsArray", rhsIsArray);
+
+        return !lhsIsPointer && !rhsIsPointer && !lhsIsArray && rhsIsArray;
+    }
+
+    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string): Statement[] {
+        // insert memcpy
+    }
+
+}
