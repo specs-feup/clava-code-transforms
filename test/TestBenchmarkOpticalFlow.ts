@@ -14,19 +14,18 @@ arrayFlattener.flattenAll();
 
 Clava.rebuild();
 
-// const folder = new FoldingPropagationCombiner();
-// for (const fun of Query.search(FunctionJp)) {
-//     folder.doPassesUntilStop(fun);
-// }
+const folder = new FoldingPropagationCombiner();
+for (const fun of Query.search(FunctionJp)) {
+    folder.doPassesUntilStop(fun);
+}
 
-// Clava.rebuild();
+Clava.rebuild();
 
 const structDecomp = new StructDecomposer();
 
-//structDecomp.decomposeByName("gradient_t");
-//structDecomp.decomposeByName("tensor_t");
+structDecomp.decomposeByName("gradient_t");
+structDecomp.decomposeByName("tensor_t");
 structDecomp.decomposeByName("outer_t");
-
-//structDecomp.decomposeByName("velocity_t");
+structDecomp.decomposeByName("velocity_t");
 
 Clava.rebuild();

@@ -270,10 +270,12 @@ export class StructDecomposer extends AdvancedTransform {
                 const leftRef = Query.searchFromInclusive(binaryOp.left, Varref).first() as Varref;
                 const rightRef = Query.searchFromInclusive(binaryOp.right, Varref).first() as Varref;
 
-                this.replaceStructToStructAssignment(leftRef, rightRef, fieldDecls);
+                const isLeft = leftRef.name === ref.name;
+                this.replaceStructToStructAssignment(leftRef, rightRef, fieldDecls, isLeft);
 
                 binaryOp.parent.detach();
                 return;
+
             }
         }
         // Struct-to-struct assignment using operator=
@@ -281,12 +283,14 @@ export class StructDecomposer extends AdvancedTransform {
         if (parentCall != null && parentCall.name.includes("operator=")) {
             const leftRef = Query.searchFromInclusive(parentCall.args[0], Varref).first() as Varref;
             const rightRef = Query.searchFromInclusive(parentCall.args[1], Varref).first() as Varref;
+            const isLeft = leftRef.name === ref.name;
 
-            this.replaceStructToStructAssignment(leftRef, rightRef, fieldDecls);
+            this.replaceStructToStructAssignment(leftRef, rightRef, fieldDecls, isLeft);
 
             parentCall.parent.detach();
             return;
         }
+
         // Struct passed as argument to a function, e.g., doSomething(bar)
         else if (ref.isFunctionArgument) {
             this.replaceRefArg(ref, fieldDecls);
@@ -324,7 +328,7 @@ export class StructDecomposer extends AdvancedTransform {
         }
     }
 
-    private replaceStructToStructAssignment(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][]): void {
+    private replaceStructToStructAssignment(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][], isLeft: boolean): void {
         const newExprs: Statement[] = [];
 
         const decomposers = [
@@ -338,7 +342,7 @@ export class StructDecomposer extends AdvancedTransform {
 
         for (const decomposer of decomposers) {
             if (decomposer.validate(leftRef, rightRef)) {
-                const fieldExprs = decomposer.decompose(leftRef, rightRef, fieldDecls);
+                const fieldExprs = decomposer.decompose(leftRef, rightRef, fieldDecls, isLeft);
                 newExprs.push(...fieldExprs);
                 break;
             }
@@ -481,5 +485,4 @@ export class StructDecomposerUtil {
         }
         return ClavaJoinPoints.exprStmt(call);
     }
-
 }

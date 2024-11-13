@@ -5,21 +5,21 @@ import { StructDecomposer, StructDecomposerUtil } from "./StructDecomposer.js";
 export abstract class StructRefDecomposer {
     public abstract validate(leftRef: Varref, rightRef: Varref): boolean;
 
-    public decompose(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][]): Statement[] {
+    public decompose(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][], isLeft: boolean): Statement[] {
         const newExprs: Statement[] = [];
 
         for (const [fieldName, fieldDecl] of fieldDecls) {
             const lhsVarName = `${leftRef.name}_${fieldName}`;
             const rhsVarName = `${rightRef.name}_${fieldName}`;
 
-            const fieldExprs = this.decomposeField(leftRef, rightRef, fieldDecl, lhsVarName, rhsVarName);
+            const fieldExprs = this.decomposeField(leftRef, rightRef, fieldDecl, lhsVarName, rhsVarName, isLeft);
             newExprs.push(...fieldExprs);
         }
 
         return newExprs;
     }
 
-    protected abstract decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string): Statement[];
+    protected abstract decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string, isLeft: boolean): Statement[];
 }
 
 export class ScalarToScalarAssignment extends StructRefDecomposer {
@@ -32,7 +32,7 @@ export class ScalarToScalarAssignment extends StructRefDecomposer {
         return !lhsIsPointer && !rhsIsPointer && !lhsHasArrayAccess && !rhsHasArrayAccess;
     }
 
-    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string): Statement[] {
+    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string, isLeft: boolean): Statement[] {
         const newExprs: Statement[] = [];
 
         if (fieldDecl.type.isArray) {
@@ -67,7 +67,7 @@ export class ArrayToArrayAssignment extends StructRefDecomposer {
         return !lhsIsPointer && !rhsIsPointer && lhsHasArrayAccess && rhsHasArrayAccess;
     }
 
-    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string): Statement[] {
+    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string, isLeft: boolean): Statement[] {
         const lhsArrayAccess = leftRef.parent as ArrayAccess;
         const newLhsVar = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
         const newLhs = lhsArrayAccess.copy() as ArrayAccess;
@@ -97,7 +97,7 @@ export class PointerToScalarAssignment extends StructRefDecomposer {
         return !lhsIsPointer && rhsIsPointer && rhsIsDeref;
     }
 
-    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string): Statement[] {
+    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string, isLeft: boolean): Statement[] {
         const newLhs = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
         const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
         const newRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
@@ -116,7 +116,7 @@ export class PointerToPointerAssignment extends StructRefDecomposer {
 
         return lhsIsPointer && rhsIsPointer;
     }
-    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string): Statement[] {
+    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string, isLeft: boolean): Statement[] {
         const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
         const newRhs = ClavaJoinPoints.varRef(rhsVarName, pointerType);
         const newLhs = ClavaJoinPoints.varRef(lhsVarName, pointerType);
@@ -139,7 +139,7 @@ export class DerefToScalarAssignment extends StructRefDecomposer {
         return lhsIsPointer && !rhsIsPointer && rhsIsAddrOf;
     }
 
-    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string): Statement[] {
+    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string, isLeft: boolean): Statement[] {
         const pointerType = ClavaJoinPoints.pointer(fieldDecl.type);
         const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
         const addrOf = ClavaJoinPoints.unaryOp("&", newRhs);
@@ -162,17 +162,10 @@ export class StructToArrayPositionAssignment extends StructRefDecomposer {
         const lhsIsArray = leftRef.type.isArray;
         const rhsIsArray = rightRef.type.isArray;
 
-        console.log("lhs: ", leftRef.code);
-        console.log("rhs: ", rightRef.code);
-        console.log("lhsIsPointer", lhsIsPointer);
-        console.log("rhsIsPointer", rhsIsPointer);
-        console.log("lhsIsArray", lhsIsArray);
-        console.log("rhsIsArray", rhsIsArray);
-
         return !lhsIsPointer && !rhsIsPointer && lhsIsArray && !rhsIsArray;
     }
 
-    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string): Statement[] {
+    protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string, isLeft: boolean): Statement[] {
         const statements: Statement[] = [];
 
         if (fieldDecl.type.isArray) {
@@ -194,9 +187,15 @@ export class StructToArrayPositionAssignment extends StructRefDecomposer {
             const lhsArrayAccess = leftRef.parent as ArrayAccess;
             const arrayIndexExpr = lhsArrayAccess.children[1] as Expression;
 
-            const newLhsVarref = fieldDecl.varref();
-            const newArrayAccess = ClavaJoinPoints.arrayAccess(newLhsVarref, arrayIndexExpr);
-
+            let newArrayAccess: Expression;
+            if (isLeft) {
+                const newLhsVarref = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+                newArrayAccess = ClavaJoinPoints.arrayAccess(newLhsVarref, arrayIndexExpr);
+            }
+            else {
+                const arrayAccessStr = `${lhsVarName}[${arrayIndexExpr.code}]`;
+                newArrayAccess = ClavaJoinPoints.exprLiteral(arrayAccessStr);
+            }
             const newRhsVarref = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
             const assign = ClavaJoinPoints.binaryOp("=", newArrayAccess, newRhsVarref);
             const stmt = ClavaJoinPoints.exprStmt(assign);
@@ -205,5 +204,4 @@ export class StructToArrayPositionAssignment extends StructRefDecomposer {
 
         return statements;
     }
-
 }
