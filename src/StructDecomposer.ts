@@ -480,7 +480,7 @@ export class StructDecomposerUtil {
         if (Clava.isCxx()) {
             call.setName("std::memcpy");
             for (const file of Clava.getProgram().files) {
-                file.addInclude("cstring");
+                file.addInclude("cstring", true);
             }
         }
         return ClavaJoinPoints.exprStmt(call);
