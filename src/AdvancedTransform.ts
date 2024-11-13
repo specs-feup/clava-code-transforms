@@ -10,16 +10,19 @@ export abstract class AdvancedTransform {
         this.silent = silent || false;
     }
 
-    protected simpleType(type: Type): string {
-        return type.code
+    protected simpleType(type: Type, removeSignedInfo: boolean = false): string {
+        const baseType = type.code
             .replace("*", "")
             .replace("struct ", "")
             .replace("const ", "")
             .replace("volatile ", "")
-            .replace("unsigned ", "")
-            .replace("signed ", "")
             .replace(/\[\d+\]/g, "")    // square brackets
             .trim();
+
+        if (!removeSignedInfo) {
+            return baseType;
+        }
+        return baseType.replace("unsigned", "").replace("signed", "").trim();
     }
 
     protected log(msg: string, level: "INFO" | "WARN" | "ERROR" = "INFO") {
