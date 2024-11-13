@@ -21,11 +21,16 @@ for (const fun of Query.search(FunctionJp)) {
 
 Clava.rebuild();
 
-const structDecomp = new StructDecomposer();
+const structs = [
+    "gradient_t",
+    "tensor_t",
+    "outer_t",
+    "velocity_t"
+]
 
-structDecomp.decomposeByName("gradient_t");
-structDecomp.decomposeByName("tensor_t");
-structDecomp.decomposeByName("outer_t");
-structDecomp.decomposeByName("velocity_t");
+const structDecomp = new StructDecomposer();
+for (const struct of structs) {
+    structDecomp.decomposeByName(struct);
+}
 
 Clava.rebuild();

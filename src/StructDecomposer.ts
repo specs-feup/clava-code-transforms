@@ -297,7 +297,7 @@ export class StructDecomposer extends AdvancedTransform {
         }
         // Unknown case
         else {
-            this.logWarning(`Could not replace ref: ${ref.code}`);
+            //this.logWarning(`Could not replace ref: ${ref.code}`);
         }
     }
 
