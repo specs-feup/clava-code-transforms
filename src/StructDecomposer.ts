@@ -4,6 +4,7 @@ import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Fi
 import { ArrayOfStructsDecl, DirectListDecl, MallocDecl, PointerListDecl, StructDeclDecomposer, StructToStructDecl } from "./StructDeclDecomposer.js";
 import { AdvancedTransform } from "./AdvancedTransform.js";
 import { ArrayToArrayAssignment, DerefToScalarAssignment, PointerToPointerAssignment, PointerToScalarAssignment, ScalarToScalarAssignment, StructToArrayPositionAssignment } from "./StructRefDecomposer.js";
+import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
 export class StructDecomposer extends AdvancedTransform {
     constructor(silent: boolean = false) {
@@ -278,12 +279,12 @@ export class StructDecomposer extends AdvancedTransform {
         // Struct-to-struct assignment using operator=
         const parentCall = ref.getAncestor("call") == null ? null : ref.getAncestor("call") as Call;
         if (parentCall != null && parentCall.name.includes("operator=")) {
-            const leftRef = Query.searchFromInclusive(parentCall.args[1], Varref).first() as Varref;
-            const rightRef = Query.searchFromInclusive(parentCall.args[0], Varref).first() as Varref;
+            const leftRef = Query.searchFromInclusive(parentCall.args[0], Varref).first() as Varref;
+            const rightRef = Query.searchFromInclusive(parentCall.args[1], Varref).first() as Varref;
 
             this.replaceStructToStructAssignment(leftRef, rightRef, fieldDecls);
 
-            //parentCall.detach();
+            parentCall.parent.detach();
             return;
         }
         // Struct passed as argument to a function, e.g., doSomething(bar)
@@ -467,3 +468,18 @@ export class StructDecomposer extends AdvancedTransform {
     }
 }
 
+export class StructDecomposerUtil {
+    public static generateMemcpy(dest: Expression, source: Expression, size: Expression): Statement {
+        const retType = ClavaJoinPoints.type("void*");
+        const call = ClavaJoinPoints.callFromName("memcpy", retType, dest, source, size);
+
+        if (Clava.isCxx()) {
+            call.setName("std::memcpy");
+            for (const file of Clava.getProgram().files) {
+                file.addInclude("cstring");
+            }
+        }
+        return ClavaJoinPoints.exprStmt(call);
+    }
+
+}

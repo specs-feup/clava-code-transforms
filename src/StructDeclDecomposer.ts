@@ -1,6 +1,7 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import { ArrayType, BinaryOp, Call, Cast, Expression, ExprStmt, Field, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
+import { StructDecomposerUtil } from "./StructDecomposer.js";
 
 export interface StructDeclDecomposer {
     validate(decl: Vardecl): boolean;
@@ -289,8 +290,15 @@ export class StructToStructDecl implements StructDeclDecomposer {
 
             if (!lhsIsPointer && !rhsIsPointer) {
                 if (field.type.isPointer) {
-                    const memcpyStr = `memcpy(&${lhsVarName}, &${rhsVarName}, sizeof(${rhsVarName}) / sizeof(${rhsVarName}[0]));`;
-                    const memcpy = ClavaJoinPoints.stmtLiteral(memcpyStr);
+                    const dest = ClavaJoinPoints.unaryOp("&", ClavaJoinPoints.varRef(lhsVarName, field.type));
+                    const src = ClavaJoinPoints.unaryOp("&", ClavaJoinPoints.varRef(rhsVarName, field.type));
+
+                    const sizeof1 = ClavaJoinPoints.exprLiteral(`sizeof(${rhsVarName})`);
+                    const sizeof2 = ClavaJoinPoints.exprLiteral(`sizeof(${rhsVarName}[0])`);
+                    const size = ClavaJoinPoints.binaryOp("/", sizeof1, sizeof2);
+
+                    const memcpy = StructDecomposerUtil.generateMemcpy(dest, src, size);
+
                     const newLhs = ClavaJoinPoints.varDeclNoInit(lhsVarName, field.type);
                     decl.insertAfter(memcpy);
 

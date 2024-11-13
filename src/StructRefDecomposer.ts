@@ -1,5 +1,6 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { ArrayAccess, Statement, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { ArrayAccess, Expression, Statement, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { StructDecomposer, StructDecomposerUtil } from "./StructDecomposer.js";
 
 export abstract class StructRefDecomposer {
     public abstract validate(leftRef: Varref, rightRef: Varref): boolean;
@@ -39,8 +40,7 @@ export class ScalarToScalarAssignment extends StructRefDecomposer {
             const newRhs = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
             const sizeof = ClavaJoinPoints.integerLiteral(fieldDecl.type.arraySize);
             const retType = ClavaJoinPoints.type("void*");
-            const call = ClavaJoinPoints.callFromName("memcpy", retType, newLhs, newRhs, sizeof);
-            const stmt = ClavaJoinPoints.exprStmt(call);
+            const stmt = StructDecomposerUtil.generateMemcpy(newLhs, newRhs, sizeof);
 
             newExprs.push(stmt);
         }
@@ -151,6 +151,10 @@ export class DerefToScalarAssignment extends StructRefDecomposer {
     }
 }
 
+/**
+ * foo[i] = bar, where foo is an array of structs and bar is a struct
+ * This only works if the array is 1D
+ */
 export class StructToArrayPositionAssignment extends StructRefDecomposer {
     public validate(leftRef: Varref, rightRef: Varref): boolean {
         const lhsIsPointer = leftRef.type.isPointer;
@@ -165,11 +169,41 @@ export class StructToArrayPositionAssignment extends StructRefDecomposer {
         console.log("lhsIsArray", lhsIsArray);
         console.log("rhsIsArray", rhsIsArray);
 
-        return !lhsIsPointer && !rhsIsPointer && !lhsIsArray && rhsIsArray;
+        return !lhsIsPointer && !rhsIsPointer && lhsIsArray && !rhsIsArray;
     }
 
     protected decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string): Statement[] {
-        // insert memcpy
+        const statements: Statement[] = [];
+
+        if (fieldDecl.type.isArray) {
+            const lhsArrayAccess = leftRef.parent as ArrayAccess;
+            const arrayIndexExpr = lhsArrayAccess.children[1] as Expression;
+
+            const dest = fieldDecl.varref();
+
+            const addrVarref = ClavaJoinPoints.varRef(lhsVarName, fieldDecl.type);
+            const addrCalc = ClavaJoinPoints.binaryOp("+", addrVarref as Varref, arrayIndexExpr.copy() as Expression);
+            const origin = ClavaJoinPoints.parenthesis(addrCalc);
+
+            const sizeof = ClavaJoinPoints.integerLiteral(fieldDecl.type.arraySize);
+
+            const stmt = StructDecomposerUtil.generateMemcpy(dest, origin, sizeof);
+            statements.push(stmt);
+        }
+        else {
+            const lhsArrayAccess = leftRef.parent as ArrayAccess;
+            const arrayIndexExpr = lhsArrayAccess.children[1] as Expression;
+
+            const newLhsVarref = fieldDecl.varref();
+            const newArrayAccess = ClavaJoinPoints.arrayAccess(newLhsVarref, arrayIndexExpr);
+
+            const newRhsVarref = ClavaJoinPoints.varRef(rhsVarName, fieldDecl.type);
+            const assign = ClavaJoinPoints.binaryOp("=", newArrayAccess, newRhsVarref);
+            const stmt = ClavaJoinPoints.exprStmt(assign);
+            statements.push(stmt);
+        }
+
+        return statements;
     }
 
 }
