@@ -20,6 +20,7 @@
     "test:structdecomp-optiflow": "clava classic dist/test/TestStructDecomposer.js -p inputs/optical-flow/ -std c++11",
     "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/",
     "bench:3d-rend": "clava classic dist/test/TestBenchmark3DRendering.js -p inputs/3d-rendering/ -std c++11",
+    "bench:digit-recog": "clava classic dist/test/TestBenchmarkDigitRecog.js -p inputs/digit-recognition/ -std c++11",
     "bench:optiflow": "clava classic dist/test/TestBenchmarkOpticalFlow.js -p inputs/optical-flow/ -std c++11",
     "clean": "rm -rf node_modules package-lock.json dist/ woven_code/ output/"
   },

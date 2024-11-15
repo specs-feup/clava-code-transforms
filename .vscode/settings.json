@@ -5,6 +5,7 @@
     "cstdio": "cpp",
     "sstream": "cpp",
     "iostream": "cpp",
-    "fstream": "cpp"
+    "fstream": "cpp",
+    "cstdlib": "cpp"
   }
 }
