@@ -8,7 +8,7 @@ import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 
 function convertExprLit() {
     for (const decl of Query.search(Vardecl)) {
-        if (decl.hasInit && decl.children[0] instanceof InitList) {
+        if (decl.children[0] instanceof InitList) {
             const initList = decl.children[0] as InitList;
 
             if (initList.children.length > 50) {
