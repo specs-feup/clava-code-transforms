@@ -1,7 +1,7 @@
 {
-  "name": "clava-code-transforms",
+  "name": "@specs-feup/clava-code-transforms",
   "version": "1.0.0",
-  "author": "tiagolascasas",
+  "author": "Tiago Lascasas Santos <tiagolascasas@outlook.com> (https://tiagolascasas.dev)",
   "description": "A set of advanced C/C++ code transformations for Clava",
   "type": "module",
   "scripts": {
@@ -35,9 +35,12 @@
     "./SwitchToIf": "./dist/src/SwitchToIf.js",
     "./Voidifier": "./dist/src/Voidifier.js"
   },
+  "files": [
+    "inputs/"
+  ],
   "dependencies": {
-    "@specs-feup/clava": "^3.0.1",
-    "@specs-feup/lara": "^3.0.2",
+    "@specs-feup/clava": "^3.0.8",
+    "@specs-feup/lara": "^3.0.5",
     "chalk": "^5.3.0"
   },
   "devDependencies": {
