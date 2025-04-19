@@ -1,9 +1,10 @@
 {
   "name": "@specs-feup/clava-code-transforms",
-  "version": "1.0.0",
+  "version": "0.9.0",
   "author": "Tiago Lascasas Santos <tiagolascasas@outlook.com> (https://tiagolascasas.dev)",
   "description": "A set of advanced C/C++ code transformations for Clava",
   "type": "module",
+  "private": false,
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
