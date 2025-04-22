@@ -74,7 +74,7 @@ export class GlobalConstantPropagator extends AdvancedTransform implements Propa
             return false;
         }
 
-        return false;
+        return true;
     }
 
     private replaceRefs(name: string, literal: Literal): number {
