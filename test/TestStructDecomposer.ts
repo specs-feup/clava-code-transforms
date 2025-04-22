@@ -1,4 +1,4 @@
-import { StructFlattener } from "../src/flattening/StructDecomposer.js";
+import { StructFlattener } from "../src/flattening/StructFlattener.js";
 import { AstDumper } from "./AstDumper.js";
 
 const dumper = new AstDumper();
