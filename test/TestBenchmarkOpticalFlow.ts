@@ -4,7 +4,7 @@ import { FoldingPropagationCombiner } from "../src/constfolding/FoldingPropagati
 import { AstDumper } from "./AstDumper.js";
 import { FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
-import { StructDecomposer } from "../src/flattening/StructDecomposer.js";
+import { StructFlattener } from "../src/flattening/StructDecomposer.js";
 
 const dumper = new AstDumper();
 console.log(dumper.dump());
@@ -28,7 +28,7 @@ const structs = [
     "velocity_t"
 ]
 
-const structDecomp = new StructDecomposer();
+const structDecomp = new StructFlattener();
 for (const struct of structs) {
     structDecomp.decomposeByName(struct);
 }

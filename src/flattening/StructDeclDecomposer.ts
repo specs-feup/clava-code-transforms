@@ -3,7 +3,7 @@ import { ArrayType, BinaryOp, Call, Cast, Expression, ExprStmt, Field, ImplicitV
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { StructDecomposerUtil } from "./StructDecomposer.js";
 
-export interface StructDeclDecomposer {
+export interface StructDeclFlattener {
     validate(decl: Vardecl): boolean;
     decompose(decl: Vardecl, fields: Field[]): [string, Vardecl][];
 }
@@ -23,7 +23,7 @@ export interface StructDeclDecomposer {
  * Data dataInit4 = {5}
  * Data dataInit5 = {.id = 105}
  */
-export class DirectListDecl implements StructDeclDecomposer {
+export class DirectListDecl implements StructDeclFlattener {
     validate(decl: Vardecl): boolean {
         const cond1 = decl.children.length != 1;
         const cond2 = decl.type.isArray;
@@ -80,7 +80,7 @@ export class DirectListDecl implements StructDeclDecomposer {
  * Data *dataInit9 = &(Data){109}
  * Data *dataInit10 = &(Data){.id = 110}
  */
-export class PointerListDecl implements StructDeclDecomposer {
+export class PointerListDecl implements StructDeclFlattener {
     validate(decl: Vardecl): boolean {
         try {
             const cond1 = decl.children.length === 1;
@@ -151,7 +151,7 @@ export class PointerListDecl implements StructDeclDecomposer {
  * Data *dataInit15 = (Data *) calloc(1, sizeof(Data))
  * 
  */
-export class MallocDecl implements StructDeclDecomposer {
+export class MallocDecl implements StructDeclFlattener {
     validate(decl: Vardecl): boolean {
         const cond1 = decl.children.length === 1;
         if (!cond1) {
@@ -257,7 +257,7 @@ export class MallocDecl implements StructDeclDecomposer {
     }
 }
 
-export class StructToStructDecl implements StructDeclDecomposer {
+export class StructToStructDecl implements StructDeclFlattener {
     validate(decl: Vardecl): boolean {
         if (decl.children.length !== 1) {
             return false;
@@ -339,7 +339,7 @@ export class StructToStructDecl implements StructDeclDecomposer {
     }
 }
 
-export class ArrayOfStructsDecl implements StructDeclDecomposer {
+export class ArrayOfStructsDecl implements StructDeclFlattener {
     validate(decl: Vardecl): boolean {
         const isArray = decl.type.isArray;
         if (!isArray) {

@@ -1,8 +1,8 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import { ArrayAccess, Expression, Statement, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
-import { StructDecomposer, StructDecomposerUtil } from "./StructDecomposer.js";
+import { StructDecomposerUtil } from "./StructDecomposer.js";
 
-export abstract class StructRefDecomposer {
+export abstract class StructRefFlattener {
     public abstract validate(leftRef: Varref, rightRef: Varref): boolean;
 
     public decompose(leftRef: Varref, rightRef: Varref, fieldDecls: [string, Vardecl][], isLeft: boolean): Statement[] {
@@ -22,7 +22,7 @@ export abstract class StructRefDecomposer {
     protected abstract decomposeField(leftRef: Varref, rightRef: Varref, fieldDecl: Vardecl, lhsVarName: string, rhsVarName: string, isLeft: boolean): Statement[];
 }
 
-export class ScalarToScalarAssignment extends StructRefDecomposer {
+export class ScalarToScalarAssignment extends StructRefFlattener {
     validate(leftRef: Varref, rightRef: Varref): boolean {
         const lhsIsPointer = leftRef.type.isPointer;
         const lhsHasArrayAccess = leftRef.parent instanceof ArrayAccess;
@@ -57,7 +57,7 @@ export class ScalarToScalarAssignment extends StructRefDecomposer {
     }
 }
 
-export class ArrayToArrayAssignment extends StructRefDecomposer {
+export class ArrayToArrayAssignment extends StructRefFlattener {
     public validate(leftRef: Varref, rightRef: Varref): boolean {
         const lhsIsPointer = leftRef.type.isPointer;
         const lhsHasArrayAccess = leftRef.parent instanceof ArrayAccess;
@@ -88,7 +88,7 @@ export class ArrayToArrayAssignment extends StructRefDecomposer {
 /**
  * foo = *bar
  */
-export class PointerToScalarAssignment extends StructRefDecomposer {
+export class PointerToScalarAssignment extends StructRefFlattener {
     public validate(leftRef: Varref, rightRef: Varref): boolean {
         const lhsIsPointer = leftRef.type.isPointer;
         const rhsIsPointer = rightRef.type.isPointer;
@@ -109,7 +109,7 @@ export class PointerToScalarAssignment extends StructRefDecomposer {
     }
 }
 
-export class PointerToPointerAssignment extends StructRefDecomposer {
+export class PointerToPointerAssignment extends StructRefFlattener {
     public validate(leftRef: Varref, rightRef: Varref): boolean {
         const lhsIsPointer = leftRef.type.isPointer;
         const rhsIsPointer = rightRef.type.isPointer;
@@ -130,7 +130,7 @@ export class PointerToPointerAssignment extends StructRefDecomposer {
 /**
  * foo = &bar, where foo is a pointer and bar is not
  */
-export class DerefToScalarAssignment extends StructRefDecomposer {
+export class DerefToScalarAssignment extends StructRefFlattener {
     public validate(leftRef: Varref, rightRef: Varref): boolean {
         const lhsIsPointer = leftRef.type.isPointer;
         const rhsIsPointer = rightRef.type.isPointer;
@@ -155,7 +155,7 @@ export class DerefToScalarAssignment extends StructRefDecomposer {
  * foo[i] = bar, where foo is an array of structs and bar is a struct
  * This only works if the array is 1D
  */
-export class StructToArrayPositionAssignment extends StructRefDecomposer {
+export class StructToArrayPositionAssignment extends StructRefFlattener {
     public validate(leftRef: Varref, rightRef: Varref): boolean {
         const lhsIsPointer = leftRef.type.isPointer;
         const rhsIsPointer = rightRef.type.isPointer;

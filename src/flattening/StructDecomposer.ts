@@ -1,14 +1,14 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, Type, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
-import { ArrayOfStructsDecl, DirectListDecl, MallocDecl, PointerListDecl, StructDeclDecomposer, StructToStructDecl } from "./StructDeclDecomposer.js";
+import { ArrayOfStructsDecl, DirectListDecl, MallocDecl, PointerListDecl, StructDeclFlattener, StructToStructDecl } from "./StructDeclDecomposer.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import { ArrayToArrayAssignment, DerefToScalarAssignment, PointerToPointerAssignment, PointerToScalarAssignment, ScalarToScalarAssignment, StructToArrayPositionAssignment } from "./StructRefDecomposer.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
-export class StructDecomposer extends AdvancedTransform {
+export class StructFlattener extends AdvancedTransform {
     constructor(silent: boolean = false) {
-        super("StructDecomposer", silent);
+        super("StructFlattener", silent);
     }
 
     public decomposeAll(): string[] {
@@ -226,7 +226,7 @@ export class StructDecomposer extends AdvancedTransform {
     private createNewVarsWithInit(decl: Vardecl, fields: Field[]): [string, Vardecl][] {
         let initVars: [string, Vardecl][] = [];
 
-        const decomposers: StructDeclDecomposer[] = [
+        const decomposers: StructDeclFlattener[] = [
             new DirectListDecl(),
             new PointerListDecl(),
             new MallocDecl(),
