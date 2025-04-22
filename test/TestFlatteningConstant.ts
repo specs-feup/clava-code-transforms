@@ -1,5 +1,5 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import { ArrayFlattener } from "../src/ArrayFlattener.js";
+import { ArrayFlattener } from "../src/flattening/ArrayFlattener.js";
 import { FoldingPropagationCombiner } from "../src/constfolding/FoldingPropagationCombiner.js";
 import { AstDumper } from "./AstDumper.js";
 import { FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";

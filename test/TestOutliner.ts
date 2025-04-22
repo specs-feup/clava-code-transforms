@@ -1,6 +1,6 @@
 import { Pragma, Scope, Statement, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import { Outliner } from "../src/Outliner.js";
+import { Outliner } from "../src/function/Outliner.js";
 import { AstDumper } from "./AstDumper.js";
 
 function processOutliningRegion(beginPragma: WrapperStmt, endPragma: WrapperStmt) {
