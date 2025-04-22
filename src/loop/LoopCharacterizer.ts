@@ -1,5 +1,5 @@
 import { BinaryOp, IntLiteral, Loop, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
-import { AdvancedTransform } from "./AdvancedTransform.js";
+import { AdvancedTransform } from "../AdvancedTransform.js";
 
 export class LoopCharacterizer extends AdvancedTransform {
     constructor(silent: boolean = false) {

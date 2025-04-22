@@ -1,7 +1,7 @@
 import { FunctionJp, Loop } from "@specs-feup/clava/api/Joinpoints.js"
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import { LoopCharacterizer } from "../src/LoopCharacterizer.js";
 import VisualizationTool from "@specs-feup/clava-visualization/api/VisualizationTool.js";
+import { LoopCharacterizer } from "../src/loop/LoopCharacterizer.js";
 
 await VisualizationTool.visualize();
 
