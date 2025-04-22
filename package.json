@@ -1,6 +1,6 @@
 {
   "name": "@specs-feup/clava-code-transforms",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "author": "Tiago Lascasas Santos <tiagolascasas@outlook.com> (https://tiagolascasas.dev)",
   "description": "A set of advanced C/C++ code transformations for Clava",
   "type": "module",
@@ -36,7 +36,7 @@
     "./LoopCharacterizer": "./dist/src/loop/LoopCharacterizer.js"
   },
   "files": [
-    "inputs/"
+    "dist/src"
   ],
   "dependencies": {
     "@specs-feup/clava": "^3.0.8",
@@ -58,5 +58,9 @@
     "typedoc": "^0.26.4",
     "typescript": "^5.5.3",
     "@specs-feup/clava-visualization": "^1.0.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/specs-feup/clava-code-transforms.git"
   }
 }
