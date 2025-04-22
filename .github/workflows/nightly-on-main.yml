@@ -1,0 +1,26 @@
+name: Nightly Command on Master Branch
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+
+jobs:
+  nightly-command:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          ref: master
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run nightly command
+        run: npm run publish:nightly
