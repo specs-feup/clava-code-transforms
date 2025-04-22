@@ -5,7 +5,10 @@ import { LoopCharacterizer } from "../src/loop/LoopCharacterizer.js";
 for (const fun of Query.search(FunctionJp, { name: "loop_characterization" })) {
     for (const loop of Query.searchFrom(fun, Loop)) {
         const lcz = new LoopCharacterizer();
-        const res = lcz.characterize(loop);
-        console.log(res);
+
+        const characterization = lcz.characterize(loop);
+        lcz.annotate(loop, characterization);
+
+        console.log(`Annotated loop with characterization:\n${characterization}`);
     }
 }

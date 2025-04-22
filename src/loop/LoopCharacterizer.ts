@@ -1,5 +1,11 @@
 import { BinaryOp, IntLiteral, Loop, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
+import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
+
+export enum LoopAnnotationIdiom {
+    CLAVA = "clava",
+    VITIS = "HLS"
+}
 
 export class LoopCharacterizer extends AdvancedTransform {
     constructor(silent: boolean = false) {
@@ -7,13 +13,29 @@ export class LoopCharacterizer extends AdvancedTransform {
     }
 
     public characterize(loop: Loop): LoopCharacterization {
+        let characterization: LoopCharacterization = this.getDefaultCharacterization();
+
         if (loop.kind == "for") {
-            return this.handleForLoop(loop);
+            characterization = this.handleForLoop(loop);
         }
         if (loop.kind == "while" || loop.kind == "dowhile") {
-            return this.handleWhileLoop(loop);
+            characterization = this.handleWhileLoop(loop);
         }
-        return this.getDefaultCharacterization();
+        return characterization;
+    }
+
+    public annotate(loop: Loop, ch: LoopCharacterization, idiom: LoopAnnotationIdiom = LoopAnnotationIdiom.CLAVA): void {
+        if (ch.isValid) {
+            const max = ch.tripCount;
+            const pragma = `#pragma ${idiom} loop_tripcount max=${max}`;
+
+            const pragmaStmt = ClavaJoinPoints.stmtLiteral(pragma);
+            loop.body.insertBegin(pragmaStmt);
+            this.log(`Annotated loop with ${idiom} idiom: ${pragma}`);
+        }
+        else {
+            this.logWarning("Loop characterization is invalid, skipping annotation");
+        }
     }
 
     private handleForLoop(loop: Loop): LoopCharacterization {
