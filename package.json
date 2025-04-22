@@ -8,6 +8,8 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "publish:latest": "npm run build && npm publish --tag latest",
+    "publish:staging": "node publish-staging.js",
     "lint": "eslint .",
     "docs": "typedoc",
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
