@@ -26,15 +26,14 @@
     "clean": "rm -rf node_modules package-lock.json dist/ woven_code/ output/"
   },
   "exports": {
-    "./ArrayFlattener": "./dist/src/ArrayFlattener.js",
-    "./ConstantFolder": "./dist/src/ConstantFolder.js",
-    "./ConstantPropagator": "./dist/src/ConstantPropagator.js",
+    "./ConstantFolder": "./dist/src/constfolding/ConstantFolder.js",
+    "./ConstantPropagator": "./dist/src/constfolding/ConstantPropagator.js",
     "./FoldingPropagationCombiner": "./dist/src/constfolding/FoldingPropagationCombiner.js",
-    "./LoopCharacterizer": "./dist/src/LoopCharacterizer.js",
-    "./Outliner": "./dist/src/Outliner.js",
-    "./StructDecomposer": "./dist/src/StructDecomposer.js",
-    "./SwitchToIf": "./dist/src/SwitchToIf.js",
-    "./Voidifier": "./dist/src/Voidifier.js"
+    "./ArrayFlattener": "./dist/src/flattening/ArrayFlattener.js",
+    "./StructFlattener": "./dist/src/flattening/StructFlattener.js",
+    "./Outliner": "./dist/src/function/Outliner.js",
+    "./Voidifier": "./dist/src/function/Voidifier.js",
+    "./LoopCharacterizer": "./dist/src/loop/LoopCharacterizer.js"
   },
   "files": [
     "inputs/"
