@@ -24,3 +24,5 @@ jobs:
 
       - name: Run nightly command
         run: npm run publish:nightly
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
