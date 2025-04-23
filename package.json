@@ -1,6 +1,6 @@
 {
   "name": "@specs-feup/clava-code-transforms",
-  "version": "0.9.1",
+  "version": "1.0.0",
   "author": "Tiago Lascasas Santos <tiagolascasas@outlook.com> (https://tiagolascasas.dev)",
   "description": "A set of advanced C/C++ code transformations for Clava",
   "type": "module",
@@ -9,7 +9,8 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "publish:latest": "npm run build && npm publish --tag latest",
-    "publish:staging": "node publish-staging.js",
+    "publish:staging": "node publish.js staging",
+    "publish:nightly": "node publish.js nightly",
     "lint": "eslint .",
     "docs": "typedoc",
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
