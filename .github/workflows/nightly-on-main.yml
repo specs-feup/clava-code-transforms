@@ -1,4 +1,4 @@
-name: Nightly Command on Master Branch
+name: Nightly Build
 
 on:
   schedule:

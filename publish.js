@@ -34,7 +34,7 @@ console.log(`Updated version to ${newVersion}`);
 
 try {
     execSync("npm run build", { stdio: 'inherit' });
-    execSync(`npm publish --tag ${tag} --dry-run`, { stdio: 'inherit' });
+    execSync(`npm publish --tag ${tag}`, { stdio: 'inherit' });
 } catch (error) {
     console.error('Error during publish:', error);
 }

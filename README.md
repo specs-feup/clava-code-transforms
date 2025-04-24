@@ -2,6 +2,8 @@
 
 A set of advanced code transformations for the [Clava C/C++ source-to-source compiler](https://github.com/specs-feup/clava).
 
+[![Nightly Build](https://github.com/specs-feup/clava-code-transforms/actions/workflows/nightly-on-main.yml/badge.svg)](https://github.com/specs-feup/clava-code-transforms/actions/workflows/nightly-on-main.yml)
+
 ## How to install
 
 This package is [available on NPM](https://www.npmjs.com/package/@specs-feup/clava-code-transforms). Assuming you already have a [Clava-based NPM project](https://github.com/specs-feup/clava-project-template) setup, you can install the latest stable release with:
