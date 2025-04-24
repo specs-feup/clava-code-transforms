@@ -10,6 +10,13 @@ const packageJsonPath = resolve(__dirname, 'package.json');
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
 const originalVersion = packageJson.version;
+const bumpedVersion = originalVersion.split('.').map((part, index) => {
+    if (index === 2) {
+        return parseInt(part, 10) + 1;
+    }
+    return parseInt(part, 10);
+}
+).join('.');
 
 const now = new Date();
 const year = now.getFullYear();
@@ -19,14 +26,18 @@ const hours = String(now.getHours()).padStart(2, '0');
 const minutes = String(now.getMinutes()).padStart(2, '0');
 const seconds = String(now.getSeconds()).padStart(2, '0');
 const timestamp = `${year}${month}${day}${hours}${minutes}.${seconds}`;
-const stagingVersion = `${originalVersion}-${tag}.${timestamp}`;
+const newVersion = `${bumpedVersion}-${tag}.${timestamp}`;
 
-packageJson.version = stagingVersion;
+packageJson.version = newVersion;
 writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-console.log(`Updated version to ${stagingVersion}`);
+console.log(`Updated version to ${newVersion}`);
 
-execSync('npm run build', { stdio: 'inherit' });
-execSync('npm publish --tag ${tag}', { stdio: 'inherit' });
+try {
+    execSync("npm run build", { stdio: 'inherit' });
+    execSync(`npm publish --tag ${tag} --dry-run`, { stdio: 'inherit' });
+} catch (error) {
+    console.error('Error during publish:', error);
+}
 
 packageJson.version = originalVersion;
 writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
