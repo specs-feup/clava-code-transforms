@@ -1,4 +1,4 @@
-name: Staging Build
+name: Latest Build
 
 on:
   workflow_dispatch:
