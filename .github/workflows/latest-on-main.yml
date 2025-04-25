@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  nightly-command:
+  publishing-command:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,6 +17,7 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: "18"
+          registry-url: "https://registry.npmjs.org/" # important for scoped packages
 
       - name: Install dependencies
         run: npm install
@@ -25,4 +26,4 @@ jobs:
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
       - name: Publish to NPM with nightly tag
-        run: npm run publish --tag latest
+        run: npm run publish:latest

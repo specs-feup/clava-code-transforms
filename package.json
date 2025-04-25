@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "publish:latest": "npm run build && npm publish --tag latest",
+    "publish:latest": "npm publish --tag latest",
     "publish:staging": "node publish.js staging",
     "publish:nightly": "node publish.js nightly",
     "lint": "eslint .",
