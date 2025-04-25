@@ -23,6 +23,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Check NODE_AUTH_TOKEN
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+          echo "NODE_AUTH_TOKEN is not set"
+          exit 1
+          else
+          echo "NODE_AUTH_TOKEN is set"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish to NPM with nightly tag
         run: npm run publish:nightly
         env:

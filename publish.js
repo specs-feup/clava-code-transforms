@@ -35,11 +35,17 @@ console.log(`Updated version to ${newVersion}`);
 try {
     execSync("npm run build", { stdio: 'inherit' });
     execSync(`npm publish --tag ${tag}`, { stdio: 'inherit' });
-} catch (error) {
+}
+catch (error) {
     console.error('Error during publish:', error);
+
+    packageJson.version = originalVersion;
+    writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+    console.log(`Reverted version back to ${originalVersion}`);
+
+    throw error;
 }
 
 packageJson.version = originalVersion;
 writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-
 console.log(`Reverted version back to ${originalVersion}`);
