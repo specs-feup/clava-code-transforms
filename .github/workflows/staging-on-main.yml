@@ -35,4 +35,4 @@ jobs:
       - name: Publish to NPM with staging tag
         run: npm run publish:staging
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
