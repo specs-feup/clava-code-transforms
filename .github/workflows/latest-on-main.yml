@@ -25,5 +25,5 @@ jobs:
       - name: Authenticate with npm
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
-      - name: Publish to NPM with nightly tag
+      - name: Publish to NPM with latest tag
         run: npm run publish:latest
