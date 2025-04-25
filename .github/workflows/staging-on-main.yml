@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  nightly-command:
+  publishing-command:
     runs-on: ubuntu-latest
 
     steps:

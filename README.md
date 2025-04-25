@@ -1,6 +1,6 @@
 # Clava Code Transforms
 
-[![Nightly Build](https://github.com/specs-feup/clava-code-transforms/actions/workflows/nightly-on-main.yml/badge.svg)](https://github.com/specs-feup/clava-code-transforms/actions/workflows/nightly-on-main.yml)
+[![Latest Build](https://github.com/specs-feup/clava-code-transforms/actions/workflows/latest-on-main.yml/badge.svg)](https://github.com/specs-feup/clava-code-transforms/actions/workflows/latest-on-main.yml) [![Staging Build](https://github.com/specs-feup/clava-code-transforms/actions/workflows/staging-on-main.yml/badge.svg)](https://github.com/specs-feup/clava-code-transforms/actions/workflows/staging-on-main.yml) [![Nightly Build](https://github.com/specs-feup/clava-code-transforms/actions/workflows/nightly-on-main.yml/badge.svg)](https://github.com/specs-feup/clava-code-transforms/actions/workflows/nightly-on-main.yml)
 
 A set of advanced code transformations for the [Clava C/C++ source-to-source compiler](https://github.com/specs-feup/clava).
 
