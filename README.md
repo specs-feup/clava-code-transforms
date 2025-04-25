@@ -1,8 +1,8 @@
 # Clava Code Transforms
 
-A set of advanced code transformations for the [Clava C/C++ source-to-source compiler](https://github.com/specs-feup/clava).
-
 [![Nightly Build](https://github.com/specs-feup/clava-code-transforms/actions/workflows/nightly-on-main.yml/badge.svg)](https://github.com/specs-feup/clava-code-transforms/actions/workflows/nightly-on-main.yml)
+
+A set of advanced code transformations for the [Clava C/C++ source-to-source compiler](https://github.com/specs-feup/clava).
 
 ## How to install
 
@@ -12,10 +12,10 @@ This package is [available on NPM](https://www.npmjs.com/package/@specs-feup/cla
 npm install @specs-feup/clava-code-transforms@latest
 ```
 
-If you want to use unstable and experimental features, use the `staging` tag instead:
+If you want to use unstable and experimental features, use the `staging` or `nightly` tags instead, as they are both built using the most recent commit in the repository. Nightly builds are built automatically every day, while staging builds are built on-demand:
 
 ```bash
-npm install @specs-feup/clava-code-transforms@staging
+npm install @specs-feup/clava-code-transforms@nightly
 ```
 
 ## Available transformations

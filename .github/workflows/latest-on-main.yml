@@ -1,8 +1,6 @@
-name: Nightly Build
+name: Staging Build
 
 on:
-  schedule:
-    - cron: "0 6 * * *"
   workflow_dispatch:
 
 jobs:
@@ -23,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Publish to NPM with nightly tag
-        run: npm run publish:nightly
+      - name: Publish to NPM with latest tag
+        run: npm run publish --tag=latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
