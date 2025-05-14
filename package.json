@@ -13,9 +13,11 @@
     "publish:nightly": "node publish.js nightly",
     "lint": "eslint .",
     "docs": "typedoc",
+    "test": "cross-env NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest --detectOpenHandles --forceExit test",
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
     "test:arrayflat-constprop": "clava dist/test/TestFlatteningConstant.js -- clang inputs/optical-flow/",
     "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
+    "test:hoisting": "clava dist/test/TestHoisting.js -- clang inputs/hoisting/",
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
     "test:outliner": "clava dist/test/TestOutliner.js -- clang inputs/outlining/",
     "test:outliner-edgecase": "clava dist/test/TestOutliner.js -- clang inputs/outlining/OutlineEdgecase.c",
@@ -48,6 +50,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
+    "@specs-feup/clava-visualization": "^1.0.5",
     "@types/jest": "^29.5.12",
     "@typescript-eslint/eslint-plugin": "^7.16.0",
     "@typescript-eslint/parser": "^7.16.0",
@@ -57,10 +60,9 @@
     "eslint-plugin-jest": "^28.6.0",
     "eslint-plugin-tsdoc": "^0.2.17",
     "jest": "^29.7.0",
-    "ts-jest": "^29.2.2",
+    "ts-jest": "^29.3.2",
     "typedoc": "^0.26.4",
-    "typescript": "^5.5.3",
-    "@specs-feup/clava-visualization": "^1.0.5"
+    "typescript": "^5.5.3"
   },
   "repository": {
     "type": "git",

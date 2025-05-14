@@ -25,7 +25,7 @@ export abstract class ConstantFolder extends AdvancedTransform {
         return folds;
     }
 
-    public static getLiteralValue(lit: Literal): number {
+    protected static getLiteralValue(lit: Literal): number {
         if (lit instanceof IntLiteral) {
             return lit.value;
         }

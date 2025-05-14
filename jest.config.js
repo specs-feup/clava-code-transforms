@@ -1,25 +1,25 @@
-import { weaverConfig } from "clava-js/code/WeaverConfiguration.js";
+import { weaverConfig } from "@specs-feup/clava/code/WeaverConfiguration.js";
 
 const config = {
-  preset: "ts-jest/presets/default-esm",
-  testEnvironment: "lara-js/jest/jestEnvironment.js",
-  testEnvironmentOptions: {
-    weaverConfig,
-  },
-  globalSetup: "lara-js/jest/jestGlobalSetup.js",
-  globalTeardown: "lara-js/jest/jestGlobalTeardown.js",
-  setupFiles: ["lara-js/jest/setupFiles/sharedJavaModule.js"],
-  //notify: true,
-  //notifyMode: "always",
-  //verbose: true,
-  collectCoverage: false,
-  coverageDirectory: "coverage",
-  coverageReporters: ["text", "lcov"],
-  collectCoverageFrom: ["src/**/*[^.d].(t|j)s"],
-  coverageProvider: "v8",
-  moduleNameMapper: {
-    "(.+)\\.js": "$1",
-  }
+    preset: "ts-jest/presets/default-esm",
+    testEnvironment: "@specs-feup/lara/jest/jestEnvironment.js",
+    testEnvironmentOptions: {
+        weaverConfig,
+    },
+    globalSetup: "@specs-feup/lara/jest/jestGlobalSetup.js",
+    globalTeardown: "@specs-feup/lara/jest/jestGlobalTeardown.js",
+    setupFiles: ["@specs-feup/lara/jest/setupFiles/sharedJavaModule.js"],
+    //notify: true,
+    //notifyMode: "always",
+    //verbose: true,
+    collectCoverage: false,
+    coverageDirectory: "coverage",
+    coverageReporters: ["text", "lcov"],
+    collectCoverageFrom: ["src/**/*[^.d].(t|j)s"],
+    coverageProvider: "v8",
+    moduleNameMapper: {
+        "(.+)\\.js": "$1",
+    }
 };
 
 export default config;
