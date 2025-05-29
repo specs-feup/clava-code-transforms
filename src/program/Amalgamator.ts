@@ -19,6 +19,7 @@ export class Amalgamator extends AdvancedTransform {
         const userIncludes = this.addIncludes(newFile);
         this.log(`${userIncludes.length} user include files will be added alongside the amalgamated file.`);
 
+        this.addEmptyLine(newFile);
         const nTypedefs = this.addTypedefs(newFile);
         this.log(`Added ${nTypedefs} typedefs to the amalgamated file.`);
 
@@ -84,13 +85,23 @@ export class Amalgamator extends AdvancedTransform {
         let nTypedefs = 0;
 
         for (const typedef of Query.search(TypedefNameDecl)) {
-            if (!typedef.filename.includes(".h") && !typedef.code.includes("struct")) {
+            const filename = typedef.filename;
+
+            if (!filename.includes(".h") && !typedef.code.includes("struct")) {
+                const comment = ClavaJoinPoints.comment(`Original file: ${filename}`);
+                newFile.insertEnd(comment);
+
                 newFile.insertEnd(ClavaJoinPoints.stmtLiteral(`${typedef.code};`));
                 nTypedefs++;
             }
         }
         for (const struct of Query.search(Struct)) {
-            if (!struct.filename.includes(".h")) {
+            const filename = struct.filename;
+
+            if (!filename.includes(".h")) {
+                const comment = ClavaJoinPoints.comment(`Original file: ${filename}`);
+                newFile.insertEnd(comment);
+
                 newFile.insertEnd(ClavaJoinPoints.stmtLiteral(struct.code));
                 nTypedefs++;
             }
