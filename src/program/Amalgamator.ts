@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { Call, FileJp, FunctionJp, Include, Statement, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
+import { Call, FileJp, FunctionJp, Include, Statement, Struct, TypedefNameDecl, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
@@ -18,6 +18,9 @@ export class Amalgamator extends AdvancedTransform {
 
         const userIncludes = this.addIncludes(newFile);
         this.log(`${userIncludes.length} user include files will be added alongside the amalgamated file.`);
+
+        const nTypedefs = this.addTypedefs(newFile);
+        this.log(`Added ${nTypedefs} typedefs to the amalgamated file.`);
 
         this.addEmptyLine(newFile);
         const signatures = this.addFunctionDecls(newFile);
@@ -75,6 +78,24 @@ export class Amalgamator extends AdvancedTransform {
             newFile.addInclude(include, false);
         }
         return Array.from(userIncludes);
+    }
+
+    private addTypedefs(newFile: FileJp): number {
+        let nTypedefs = 0;
+
+        for (const typedef of Query.search(TypedefNameDecl)) {
+            if (!typedef.filename.includes(".h") && !typedef.code.includes("struct")) {
+                newFile.insertEnd(ClavaJoinPoints.stmtLiteral(`${typedef.code};`));
+                nTypedefs++;
+            }
+        }
+        for (const struct of Query.search(Struct)) {
+            if (!struct.filename.includes(".h")) {
+                newFile.insertEnd(ClavaJoinPoints.stmtLiteral(struct.code));
+                nTypedefs++;
+            }
+        }
+        return nTypedefs;
     }
 
     private getAllCalledFunctions(entryPoint: FunctionJp): Set<string> {
