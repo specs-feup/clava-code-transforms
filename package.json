@@ -13,7 +13,7 @@
     "publish:nightly": "node publish.js nightly",
     "lint": "eslint .",
     "docs": "typedoc",
-    "test": "cross-env NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest --detectOpenHandles --forceExit test",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles --forceExit",
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
     "test:arrayflat-constprop": "clava dist/test/TestFlatteningConstant.js -- clang inputs/optical-flow/",
     "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
@@ -25,6 +25,7 @@
     "test:structdecomp-cpp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp-cpp/ -std c++11",
     "test:structdecomp-optiflow": "clava classic dist/test/TestStructDecomposer.js -p inputs/optical-flow/ -std c++11",
     "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/",
+    "test:merging": "clava classic dist/test/TestSingleFileMerger.js -p inputs/disparity/ -ncg",
     "bench:3d-rend": "clava classic dist/test/TestBenchmark3DRendering.js -p inputs/3d-rendering/ -std c++11",
     "bench:digit-recog": "clava classic dist/test/TestBenchmarkDigitRecog.js -p inputs/digit-recognition/ -std c++11",
     "bench:optiflow": "clava classic dist/test/TestBenchmarkOpticalFlow.js -p inputs/optical-flow/ -std c++11",
@@ -38,7 +39,8 @@
     "./StructFlattener": "./dist/src/flattening/StructFlattener.js",
     "./Outliner": "./dist/src/function/Outliner.js",
     "./Voidifier": "./dist/src/function/Voidifier.js",
-    "./LoopCharacterizer": "./dist/src/loop/LoopCharacterizer.js"
+    "./LoopCharacterizer": "./dist/src/loop/LoopCharacterizer.js",
+    "./SingleFileMerger": "./dist/src/program/SingleFileMerger.js"
   },
   "files": [
     "dist/src"
@@ -51,7 +53,7 @@
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@specs-feup/clava-visualization": "^1.0.5",
-    "@types/jest": "^29.5.12",
+    "@types/jest": "^29.5.14",
     "@typescript-eslint/eslint-plugin": "^7.16.0",
     "@typescript-eslint/parser": "^7.16.0",
     "cross-env": "^7.0.3",
