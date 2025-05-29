@@ -124,3 +124,5 @@ is_temporary.txt
 omp.txt
 
 types_with_templates.txt
+
+outputs/

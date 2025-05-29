@@ -1,8 +1,8 @@
-import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { FileJp, Include } from "@specs-feup/clava/api/Joinpoints.js";
+import { FileJp, FunctionJp, Include, Statement } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
+import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
 export class SingleFileMerger extends AdvancedTransform {
 
@@ -15,15 +15,28 @@ export class SingleFileMerger extends AdvancedTransform {
 
         this.addIncludes(newFile);
 
+        const allFunctions = Query.search(FunctionJp, { isImplementation: true });
+        for (const func of allFunctions) {
+            const stmt = this.generateDecl(func);
+            newFile.insertEnd(stmt);
+        }
 
-        //Clava.getProgram().addFile(newFile);
-        newFile.write("outputs");
+        Clava.getProgram().addFile(newFile);
         return newFile;
     }
 
-    private addIncludes(file: FileJp): void {
-        for (const include of Query.search(Include)) {
-            file.addIncludeJp(include);
+    private generateDecl(func: FunctionJp): Statement {
+        const decl = func.getDeclaration(true);
+        return ClavaJoinPoints.stmtLiteral(`${decl};`)
+    }
+
+    private addIncludes(newFile: FileJp): void {
+        for (const file of Query.search(FileJp)) {
+            for (const include of file.includes) {
+                const name = include.name;
+                const isAngled = include.isAngled;
+                newFile.addInclude(name, isAngled);
+            }
         }
     }
 }
