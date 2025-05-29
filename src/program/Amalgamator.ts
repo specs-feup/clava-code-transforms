@@ -105,13 +105,25 @@ export class Amalgamator extends AdvancedTransform {
     }
 
     private addGlobals(newFile: FileJp): number {
-        let n = 0;
+
+        const realGlobals: string[] = [];
+        const externalGlobals: string[] = [];
+
         const allGlobals = Query.search(Vardecl, { isGlobal: true });
         for (const global of allGlobals) {
-            newFile.insertEnd(global.copy());
-            n++;
+            global.code.startsWith("extern") ?
+                externalGlobals.push(global.code.split(" ").slice(1).join(" ")) :
+                realGlobals.push(global.code);
         }
-        return n;
+        externalGlobals.forEach(global => {
+            if (!realGlobals.includes(global)) {
+                realGlobals.push(global);
+            }
+        });
+        realGlobals.forEach(global => {
+            newFile.insertEnd(ClavaJoinPoints.stmtLiteral(`${global};`));
+        });
+        return realGlobals.length;
     }
 
     private addFunctionImpls(newFile: FileJp, signatures: Set<string>): number {
