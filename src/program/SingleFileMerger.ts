@@ -87,12 +87,19 @@ export class SingleFileMerger extends AdvancedTransform {
     }
 
     private addFunctionImpls(newFile: FileJp): void {
+        const uniqueFunctions = new Set<string>();
+
         for (const file of Query.search(FileJp)) {
             const comment = ClavaJoinPoints.comment(`Original file: ${file.name}`);
             newFile.insertEnd(comment);
 
             for (const func of Query.searchFrom(file, FunctionJp, { isImplementation: true })) {
-                newFile.insertEnd(func.copy());
+                if (!uniqueFunctions.has(func.name)) {
+                    newFile.insertEnd(func.copy());
+                    uniqueFunctions.add(func.name);
+                } else {
+                    this.logWarning(`Found a duplicate function implementation of '${func.name}' in file '${file.name}'. It will be ignored.`);
+                }
             }
         }
     }
