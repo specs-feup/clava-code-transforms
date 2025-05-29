@@ -1,8 +1,8 @@
 import { Amalgamator } from "../src/program/Amalgamator.js";
 
-const merger = new Amalgamator();
+const amalg = new Amalgamator();
 
-const mergedFileName = "disparity";
-const [mergedFile, userIncludes] = merger.merge(mergedFileName);
+const amalgamatedFileName = "disparity";
+const [amalgamatedFile, userIncludes] = amalg.amalgamate(amalgamatedFileName);
 
-merger.writeMergedFile(mergedFile, "outputs/disparity-merged", userIncludes);
+amalg.writeAmalgamation(amalgamatedFile, "outputs/disparity-merged", userIncludes);

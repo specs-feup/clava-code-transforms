@@ -298,10 +298,10 @@ Amalgamates all files into a single C/C++ file, plus any necessary user includes
 ```TypeScript
 import { SingleFileMerger } from "@specs-feup/clava-code-transforms/SingleFileMerger";
 
-const merger = new SingleFileMerger();
+const amalg = new Amalgamator();
 
-const mergedFileName = "disparity";
-const [mergedFile, userIncludes] = merger.merge(mergedFileName);
+const amalgamatedFileName = "disparity";
+const [amalgamatedFile, userIncludes] = amalg.amalgamate(amalgamatedFileName);
 
-merger.writeMergedFile(mergedFile, "outputs/disparity-merged", userIncludes);
+amalg.writeAmalgamation(amalgamatedFile, "outputs/disparity-merged", userIncludes);
 ```

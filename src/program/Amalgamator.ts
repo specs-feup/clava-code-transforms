@@ -10,7 +10,7 @@ export class Amalgamator extends AdvancedTransform {
         super("Amalgamator", silent);
     }
 
-    public merge(fileName: string): [FileJp, FileJp[]] {
+    public amalgamate(fileName: string): [FileJp, FileJp[]] {
         const ext = Clava.isCxx() ? "cpp" : "c";
         const fullFileName = `${fileName}.${ext}`;
         const newFile = ClavaJoinPoints.file(fullFileName);
@@ -32,7 +32,7 @@ export class Amalgamator extends AdvancedTransform {
         return [newFile, userIncludesFiles];
     }
 
-    public writeMergedFile(sourceFile: FileJp, outputPath: string, userIncludes: FileJp[] = []): void {
+    public writeAmalgamation(sourceFile: FileJp, outputPath: string, userIncludes: FileJp[] = []): void {
         sourceFile.write(outputPath);
 
         for (const includeFile of userIncludes) {
