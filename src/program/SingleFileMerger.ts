@@ -11,7 +11,9 @@ export class SingleFileMerger extends AdvancedTransform {
     }
 
     public merge(fileName: string): FileJp {
-        const newFile = ClavaJoinPoints.file(fileName);
+        const ext = Clava.isCxx() ? "cpp" : "c";
+        const fullFileName = `${fileName}.${ext}`;
+        const newFile = ClavaJoinPoints.file(fullFileName);
 
         this.addIncludes(newFile);
 
