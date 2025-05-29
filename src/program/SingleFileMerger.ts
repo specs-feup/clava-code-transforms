@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { FileJp, FunctionJp, Include, Statement } from "@specs-feup/clava/api/Joinpoints.js";
+import { FileJp, FunctionJp, Include, Statement, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
@@ -17,19 +17,14 @@ export class SingleFileMerger extends AdvancedTransform {
 
         this.addIncludes(newFile);
 
-        const allFunctions = Query.search(FunctionJp, { isImplementation: true });
-        for (const func of allFunctions) {
-            const stmt = this.generateDecl(func);
-            newFile.insertEnd(stmt);
-        }
+        this.addFunctionDecls(newFile);
+
+        this.addGlobals(newFile);
+
+        this.addFunctionImpls(newFile);
 
         Clava.getProgram().addFile(newFile);
         return newFile;
-    }
-
-    private generateDecl(func: FunctionJp): Statement {
-        const decl = func.getDeclaration(true);
-        return ClavaJoinPoints.stmtLiteral(`${decl};`)
     }
 
     private addIncludes(newFile: FileJp): void {
@@ -39,6 +34,28 @@ export class SingleFileMerger extends AdvancedTransform {
                 const isAngled = include.isAngled;
                 newFile.addInclude(name, isAngled);
             }
+        }
+    }
+
+    private addFunctionDecls(newFile: FileJp): void {
+        const allFunctions = Query.search(FunctionJp, { isImplementation: true });
+        for (const func of allFunctions) {
+            const decl = func.getDeclaration(true);
+            newFile.insertEnd(ClavaJoinPoints.stmtLiteral(`${decl};`));
+        }
+    }
+
+    private addGlobals(newFile: FileJp): void {
+        const allGlobals = Query.search(Vardecl, { isGlobal: true });
+        for (const global of allGlobals) {
+            newFile.insertEnd(global.copy());
+        }
+    }
+
+    private addFunctionImpls(newFile: FileJp): void {
+        const allFunctions = Query.search(FunctionJp, { isImplementation: true });
+        for (const func of allFunctions) {
+            newFile.insertEnd(func.copy());
         }
     }
 }
