@@ -1,6 +1,6 @@
-import { SingleFileMerger } from "../src/program/SingleFileMerger.js";
+import { Amalgamator } from "../src/program/Amalgamator.js";
 
-const merger = new SingleFileMerger();
+const merger = new Amalgamator();
 
 const mergedFileName = "disparity";
 const [mergedFile, userIncludes] = merger.merge(mergedFileName);

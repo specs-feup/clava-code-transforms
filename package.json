@@ -25,7 +25,7 @@
     "test:structdecomp-cpp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp-cpp/ -std c++11",
     "test:structdecomp-optiflow": "clava classic dist/test/TestStructDecomposer.js -p inputs/optical-flow/ -std c++11",
     "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/",
-    "test:merging": "clava classic dist/test/TestSingleFileMerger.js -p inputs/disparity/ -ncg -std c11 -cr -cfs -pi",
+    "test:amalgamation": "clava classic dist/test/TestAmalgamator.js -p inputs/disparity/ -ncg -std c11 -cr -cfs -pi",
     "bench:3d-rend": "clava classic dist/test/TestBenchmark3DRendering.js -p inputs/3d-rendering/ -std c++11",
     "bench:digit-recog": "clava classic dist/test/TestBenchmarkDigitRecog.js -p inputs/digit-recognition/ -std c++11",
     "bench:optiflow": "clava classic dist/test/TestBenchmarkOpticalFlow.js -p inputs/optical-flow/ -std c++11",
@@ -40,7 +40,7 @@
     "./Outliner": "./dist/src/function/Outliner.js",
     "./Voidifier": "./dist/src/function/Voidifier.js",
     "./LoopCharacterizer": "./dist/src/loop/LoopCharacterizer.js",
-    "./SingleFileMerger": "./dist/src/program/SingleFileMerger.js"
+    "./Amalgamator": "./dist/src/program/Amalgamator.js"
   },
   "files": [
     "dist/src"

@@ -4,10 +4,10 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
-export class SingleFileMerger extends AdvancedTransform {
+export class Amalgamator extends AdvancedTransform {
 
     constructor(silent: boolean = false) {
-        super("SingleFileMerger", silent);
+        super("Amalgamator", silent);
     }
 
     public merge(fileName: string): [FileJp, FileJp[]] {
