@@ -290,3 +290,18 @@ With the output, for the first loop:
     "tripCount": 100
 }
 ```
+
+### C/C++ Amalgamation
+
+Amalgamates all files into a single C/C++ file, plus any necessary user includes:
+
+```TypeScript
+import { SingleFileMerger } from "@specs-feup/clava-code-transforms/SingleFileMerger";
+
+const merger = new SingleFileMerger();
+
+const mergedFileName = "disparity";
+const [mergedFile, userIncludes] = merger.merge(mergedFileName);
+
+merger.writeMergedFile(mergedFile, "outputs/disparity-merged", userIncludes);
+```
