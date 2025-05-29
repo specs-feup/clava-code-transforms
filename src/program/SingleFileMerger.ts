@@ -10,31 +10,65 @@ export class SingleFileMerger extends AdvancedTransform {
         super("SingleFileMerger", silent);
     }
 
-    public merge(fileName: string): FileJp {
+    public merge(fileName: string): [FileJp, FileJp[]] {
         const ext = Clava.isCxx() ? "cpp" : "c";
         const fullFileName = `${fileName}.${ext}`;
         const newFile = ClavaJoinPoints.file(fullFileName);
 
-        this.addIncludes(newFile);
+        const userIncludes = this.addIncludes(newFile);
 
+        this.addEmptyLine(newFile);
         this.addFunctionDecls(newFile);
 
+        this.addEmptyLine(newFile);
         this.addGlobals(newFile);
 
+        this.addEmptyLine(newFile);
         this.addFunctionImpls(newFile);
 
         Clava.getProgram().addFile(newFile);
-        return newFile;
+
+        const userIncludesFiles = this.getUserIncludeFiles(userIncludes);
+        return [newFile, userIncludesFiles];
     }
 
-    private addIncludes(newFile: FileJp): void {
+    public writeMergedFile(sourceFile: FileJp, outputPath: string, userIncludes: FileJp[] = []): void {
+        sourceFile.write(outputPath);
+
+        for (const includeFile of userIncludes) {
+            includeFile.write(outputPath);
+        }
+    }
+
+    private addEmptyLine(newFile: FileJp): void {
+        const emptyLine: Statement = ClavaJoinPoints.stmtLiteral("");
+        newFile.insertEnd(emptyLine);
+    }
+
+    private addIncludes(newFile: FileJp): string[] {
+        const systemIncludes = new Set<string>();
+        const userIncludes = new Set<string>();
+
         for (const file of Query.search(FileJp)) {
             for (const include of file.includes) {
                 const name = include.name;
-                const isAngled = include.isAngled;
-                newFile.addInclude(name, isAngled);
+
+                if (include.isAngled) {
+                    systemIncludes.add(name);
+                } else {
+                    userIncludes.add(name);
+                }
             }
         }
+
+        for (const include of systemIncludes) {
+            newFile.addInclude(include, true);
+        }
+
+        for (const include of userIncludes) {
+            newFile.addInclude(include, false);
+        }
+        return Array.from(userIncludes);
     }
 
     private addFunctionDecls(newFile: FileJp): void {
@@ -53,9 +87,20 @@ export class SingleFileMerger extends AdvancedTransform {
     }
 
     private addFunctionImpls(newFile: FileJp): void {
-        const allFunctions = Query.search(FunctionJp, { isImplementation: true });
-        for (const func of allFunctions) {
-            newFile.insertEnd(func.copy());
+        for (const file of Query.search(FileJp)) {
+            const comment = ClavaJoinPoints.comment(`Original file: ${file.name}`);
+            newFile.insertEnd(comment);
+
+            for (const func of Query.searchFrom(file, FunctionJp, { isImplementation: true })) {
+                newFile.insertEnd(func.copy());
+            }
         }
+    }
+
+    private getUserIncludeFiles(userIncludes: string[]): FileJp[] {
+        return userIncludes.map(include => {
+            const file = Query.search(FileJp, { name: include }).first()!;
+            return file;
+        });
     }
 }
