@@ -296,7 +296,7 @@ With the output, for the first loop:
 Amalgamates all files into a single C/C++ file, plus any necessary user includes:
 
 ```TypeScript
-import { SingleFileMerger } from "@specs-feup/clava-code-transforms/SingleFileMerger";
+import { Amalgamator } from "@specs-feup/clava-code-transforms/Amalgamator";
 
 const amalg = new Amalgamator();
 

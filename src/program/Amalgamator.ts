@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { FileJp, FunctionJp, Include, Statement, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
+import { Call, FileJp, FunctionJp, Include, Statement, Vardecl } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
@@ -14,21 +14,27 @@ export class Amalgamator extends AdvancedTransform {
         const ext = Clava.isCxx() ? "cpp" : "c";
         const fullFileName = `${fileName}.${ext}`;
         const newFile = ClavaJoinPoints.file(fullFileName);
+        this.log(`Creating amalgamated file: ${fullFileName}`);
 
         const userIncludes = this.addIncludes(newFile);
+        this.log(`${userIncludes.length} user include files will be added alongside the amalgamated file.`);
 
         this.addEmptyLine(newFile);
-        this.addFunctionDecls(newFile);
+        const signatures = this.addFunctionDecls(newFile);
+        this.log(`Added ${signatures.size} function declarations to the amalgamated file.`);
 
         this.addEmptyLine(newFile);
-        this.addGlobals(newFile);
+        const nGlobals = this.addGlobals(newFile);
+        this.log(`Added ${nGlobals} global variable declarations to the amalgamated file.`);
 
         this.addEmptyLine(newFile);
-        this.addFunctionImpls(newFile);
+        const nImpls = this.addFunctionImpls(newFile, signatures);
+        this.log(`Added ${nImpls} function implementations to the amalgamated file.`);
 
         Clava.getProgram().addFile(newFile);
-
         const userIncludesFiles = this.getUserIncludeFiles(userIncludes);
+
+        this.log(`Amalgamation completed in file '${newFile.name}' with ${userIncludesFiles.length} additional user includes`);
         return [newFile, userIncludesFiles];
     }
 
@@ -71,37 +77,60 @@ export class Amalgamator extends AdvancedTransform {
         return Array.from(userIncludes);
     }
 
-    private addFunctionDecls(newFile: FileJp): void {
-        const allFunctions = Query.search(FunctionJp, { isImplementation: true });
-        for (const func of allFunctions) {
-            const decl = func.getDeclaration(true);
-            newFile.insertEnd(ClavaJoinPoints.stmtLiteral(`${decl};`));
+    private getAllCalledFunctions(entryPoint: FunctionJp): Set<string> {
+        const signatures = new Set<string>();
+
+        for (const call of Query.searchFrom(entryPoint, Call)) {
+            const fun = call.function;
+            const signature = fun.getDeclaration(true);
+
+            if (fun.isImplementation) {
+                signatures.add(signature);
+            }
+            const childSignatures = this.getAllCalledFunctions(fun);
+            childSignatures.forEach(sig => signatures.add(sig));
         }
+        return signatures;
     }
 
-    private addGlobals(newFile: FileJp): void {
+    private addFunctionDecls(newFile: FileJp): Set<string> {
+        const entryPoint = Query.search(FunctionJp, { name: "main" }).first()!;
+        const signatures = this.getAllCalledFunctions(entryPoint);
+        signatures.add(entryPoint.getDeclaration(true));
+
+        signatures.forEach(signature => {
+            newFile.insertEnd(ClavaJoinPoints.stmtLiteral(`${signature};`));
+        });
+        return signatures;
+    }
+
+    private addGlobals(newFile: FileJp): number {
+        let n = 0;
         const allGlobals = Query.search(Vardecl, { isGlobal: true });
         for (const global of allGlobals) {
             newFile.insertEnd(global.copy());
+            n++;
         }
+        return n;
     }
 
-    private addFunctionImpls(newFile: FileJp): void {
+    private addFunctionImpls(newFile: FileJp, signatures: Set<string>): number {
         const uniqueFunctions = new Set<string>();
 
         for (const file of Query.search(FileJp)) {
-            const comment = ClavaJoinPoints.comment(`Original file: ${file.name}`);
-            newFile.insertEnd(comment);
-
             for (const func of Query.searchFrom(file, FunctionJp, { isImplementation: true })) {
-                if (!uniqueFunctions.has(func.name)) {
+                const signature = func.getDeclaration(true);
+
+                if (!uniqueFunctions.has(func.name) && signatures.has(signature)) {
+                    const comment = ClavaJoinPoints.comment(`Original file: ${file.name}`);
+                    newFile.insertEnd(comment);
+
                     newFile.insertEnd(func.copy());
                     uniqueFunctions.add(func.name);
-                } else {
-                    this.logWarning(`Found a duplicate function implementation of '${func.name}' in file '${file.name}'. It will be ignored.`);
                 }
             }
         }
+        return uniqueFunctions.size;
     }
 
     private getUserIncludeFiles(userIncludes: string[]): FileJp[] {
