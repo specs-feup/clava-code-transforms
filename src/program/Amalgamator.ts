@@ -3,6 +3,8 @@ import { Call, FileJp, FunctionJp, Include, Statement, Struct, TypedefNameDecl, 
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
+import { join } from "path";
+import { tmpdir } from "os";
 
 export class Amalgamator extends AdvancedTransform {
 
@@ -48,6 +50,17 @@ export class Amalgamator extends AdvancedTransform {
         for (const includeFile of userIncludes) {
             includeFile.write(outputPath);
         }
+    }
+
+    public replaceAstWithAmalgamation(sourceFile: FileJp, userIncludes: FileJp[] = []): boolean {
+        const toRemove = Query.search(FileJp).get().filter(file => {
+            return file.name !== sourceFile.name && !userIncludes.some(include => include.name === file.name);
+        });
+        toRemove.forEach(file => {
+            this.log(`Removing file from AST: ${file.name}`);
+            file.detach();
+        });
+        return Clava.rebuild();
     }
 
     private addEmptyLine(newFile: FileJp): void {

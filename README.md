@@ -299,9 +299,14 @@ Amalgamates all files into a single C/C++ file, plus any necessary user includes
 import { Amalgamator } from "@specs-feup/clava-code-transforms/Amalgamator";
 
 const amalg = new Amalgamator();
+const amalgamatedFileName = "disparity";    // extension is inferred automatically
 
-const amalgamatedFileName = "disparity";
+// By default, it adds the amalgamated file to the current AST
 const [amalgamatedFile, userIncludes] = amalg.amalgamate(amalgamatedFileName);
 
-amalg.writeAmalgamation(amalgamatedFile, "outputs/disparity-merged", userIncludes);
+// You can output the amalgamated file + any required include files
+amalg.writeAmalgamation(amalgamatedFile, "./disparity-merged", userIncludes);
+
+// You can also update the AST to have only the amalgamated file and the includes
+amalg.replaceAstWithAmalgamation(amalgamatedFile, userIncludes);
 ```
