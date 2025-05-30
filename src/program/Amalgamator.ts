@@ -60,7 +60,13 @@ export class Amalgamator extends AdvancedTransform {
             this.log(`Removing file from AST: ${file.name}`);
             file.detach();
         });
-        return Clava.rebuild();
+        const success = Clava.rebuild();
+        if (success) {
+            this.log(`Replaced AST with amalgamation from file ${sourceFile.name}`);
+        } else {
+            this.logError(`Failed to replace AST with amalgamation from file ${sourceFile.name}`);
+        }
+        return success;
     }
 
     private addEmptyLine(newFile: FileJp): void {
