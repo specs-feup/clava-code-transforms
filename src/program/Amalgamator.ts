@@ -3,8 +3,6 @@ import { Call, FileJp, FunctionJp, Include, Statement, Struct, TypedefNameDecl, 
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
-import { join } from "path";
-import { tmpdir } from "os";
 
 export class Amalgamator extends AdvancedTransform {
 
@@ -57,7 +55,6 @@ export class Amalgamator extends AdvancedTransform {
             return file.name !== sourceFile.name && !userIncludes.some(include => include.name === file.name);
         });
         toRemove.forEach(file => {
-            this.log(`Removing file from AST: ${file.name}`);
             file.detach();
         });
         const success = Clava.rebuild();
@@ -128,14 +125,30 @@ export class Amalgamator extends AdvancedTransform {
         return nTypedefs;
     }
 
+    private getSignature(func: FunctionJp): string {
+        try {
+            const operatorRegex = /\boperator\s*[\+\-\*\/%<>=!&|^~\[\]()]+/;
+            if (func.name.match(operatorRegex)) {
+                return "";
+            }
+            else {
+                return func.getDeclaration(true);
+            }
+        }
+        catch (error) {
+            this.logError(`Error getting signature for function ${func.name}: ${error}`);
+            return "";
+        };
+    }
+
     private getAllCalledFunctions(entryPoint: FunctionJp): Set<string> {
         const signatures = new Set<string>();
 
         for (const call of Query.searchFrom(entryPoint, Call)) {
             const fun = call.function;
-            const signature = fun.getDeclaration(true);
+            const signature = this.getSignature(fun);
 
-            if (fun.isImplementation) {
+            if (fun.isImplementation && signature !== "") {
                 signatures.add(signature);
             }
             const childSignatures = this.getAllCalledFunctions(fun);
@@ -147,7 +160,10 @@ export class Amalgamator extends AdvancedTransform {
     private addFunctionDecls(newFile: FileJp): Set<string> {
         const entryPoint = Query.search(FunctionJp, { name: "main" }).first()!;
         const signatures = this.getAllCalledFunctions(entryPoint);
-        signatures.add(entryPoint.getDeclaration(true));
+        const thisSignature = this.getSignature(entryPoint);
+        if (thisSignature !== "") {
+            signatures.add(this.getSignature(entryPoint));
+        }
 
         signatures.forEach(signature => {
             newFile.insertEnd(ClavaJoinPoints.stmtLiteral(`${signature};`));
@@ -182,9 +198,9 @@ export class Amalgamator extends AdvancedTransform {
 
         for (const file of Query.search(FileJp)) {
             for (const func of Query.searchFrom(file, FunctionJp, { isImplementation: true })) {
-                const signature = func.getDeclaration(true);
+                const signature = this.getSignature(func);
 
-                if (!uniqueFunctions.has(func.name) && signatures.has(signature)) {
+                if (!uniqueFunctions.has(func.name) && signatures.has(signature) && signature !== "") {
                     const comment = ClavaJoinPoints.comment(`Original file: ${file.name}`);
                     newFile.insertEnd(comment);
 
