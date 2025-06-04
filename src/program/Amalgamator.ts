@@ -172,12 +172,14 @@ export class Amalgamator extends AdvancedTransform {
     }
 
     private addGlobals(newFile: FileJp): number {
-
         const realGlobals: string[] = [];
         const externalGlobals: string[] = [];
 
         const allGlobals = Query.search(Vardecl, { isGlobal: true });
         for (const global of allGlobals) {
+            if (global.filename.endsWith(".h") || global.filename.endsWith(".hpp")) {
+                continue; // Skip globals defined in header files
+            }
             global.code.startsWith("extern") ?
                 externalGlobals.push(global.code.split(" ").slice(1).join(" ")) :
                 realGlobals.push(global.code);
