@@ -1,0 +1,55 @@
+void foo(int *a, int *b)
+{
+    int c = 0;
+
+    for (int i = 0; i < 10; i++)
+    {
+        c += a[i] + b[i];
+    }
+
+    if (c > 0)
+    {
+        c = 1;
+    }
+    else
+    {
+        c = 0;
+        {
+            int x0 = 1;
+            int x1 = 2;
+            int x2 = 3;
+            int x3 = 4;
+            int x4 = 5;
+        }
+        int x0 = 1;
+        int x1 = 2;
+        int x2 = 3;
+        int x3 = 4;
+        int x4 = 5;
+    }
+
+    int x0 = 1;
+    int x1 = 2;
+    int x2 = 3;
+    int x3 = 4;
+    int x4 = 5;
+
+    {
+        int x5 = 6;
+        int x6 = 7;
+        int x7 = 8;
+        int x8 = 9;
+        int x9 = 10;
+
+        for (int j = 0; j < 5; j++)
+        {
+            c += x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9;
+        }
+    }
+
+    int x5 = 6;
+    int x6 = 7;
+    int x7 = 8;
+    int x8 = 9;
+    int x9 = 10;
+}

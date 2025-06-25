@@ -23,6 +23,7 @@
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
     "test:outliner": "clava dist/test/TestOutliner.js -- clang inputs/outlining/",
     "test:outliner-edgecase": "clava dist/test/TestOutliner.js -- clang inputs/outlining/OutlineEdgecase.c",
+    "test:scopeflat": "clava dist/test/TestScopeFlattener.js -- clang inputs/scopeflat/",
     "test:structdecomp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp/ -std c11",
     "test:structdecomp-cpp": "clava classic dist/test/TestStructDecomposer.js -p inputs/structdecomp-cpp/ -std c++11",
     "test:structdecomp-optiflow": "clava classic dist/test/TestStructDecomposer.js -p inputs/optical-flow/ -std c++11",
