@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { AdjustedType, ArrayType, BuiltinType, Call, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, TypedefType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdjustedType, ArrayType, BuiltinType, Call, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
@@ -31,6 +31,37 @@ export class Outliner extends AdvancedTransform {
      */
     public outline(begin: Statement, end: Statement, outlineAllDecls: boolean = false): [FunctionJp, Call] | [null, null] {
         return this.outlineWithName(begin, end, this.generateFunctionName(), outlineAllDecls)
+    }
+
+    public outlineWithWrappers(begin: WrapperStmt, end: WrapperStmt, outlineAllDecls: boolean = false): [FunctionJp, Call] | [null, null] {
+        const beginPragma = begin.code.trim().replace(/\s+/g, ' ').replace(";", "");
+        const endPragma = end.code.trim().replace(/\s+/g, ' ').replace(";", "");
+        console.log("Begin pragma: " + beginPragma);
+        console.log("End pragma: " + endPragma);
+
+        if (!beginPragma.toLowerCase().includes("#pragma clava begin_outline")) {
+            this.logError("Provided begin wrapper is not a valid outlining pragma! Begin = " + beginPragma);
+            return [null, null];
+        }
+        if (!endPragma.toLowerCase().includes("#pragma clava end_outline")) {
+            this.logError("Provided end wrapper is not a valid outlining pragma! End = " + endPragma);
+            return [null, null];
+        }
+        const funName = beginPragma.split(" ")[3] || this.generateFunctionName();
+        console.log(beginPragma.split(" ")[3]);
+
+        // we need to get the statements immediately before and after the wrappers
+        const beginStmt = begin.siblingsRight[0] as Statement;
+        const endStmt = end.siblingsLeft[end.siblingsLeft.length - 1] as Statement;
+
+        if (beginStmt == null || endStmt == null) {
+            this.logError("Could not find the statements to outline! Begin = " + beginStmt + ", end = " + endStmt);
+            return [null, null];
+        }
+        begin.detach();
+        end.detach();
+
+        return this.outlineWithName(beginStmt, endStmt, funName, outlineAllDecls);
     }
 
     /**
