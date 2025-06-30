@@ -1,7 +1,6 @@
 import { Pragma, Scope, Statement, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { Outliner } from "../src/function/Outliner.js";
-import { AstDumper } from "./AstDumper.js";
 
 function processOutliningRegion(beginPragma: WrapperStmt, endPragma: WrapperStmt) {
     const begin = beginPragma.siblingsRight[0] as Statement; // Stmt immediately before the first pragma
@@ -14,10 +13,6 @@ function processOutliningRegion(beginPragma: WrapperStmt, endPragma: WrapperStmt
     outliner.outline(begin, end);
     console.log("Outlining finished!\n");
 }
-
-const dumper = new AstDumper();
-const astDump = dumper.dump();
-console.log(astDump);
 
 // We want the wrapper statement around the pragma, not the pragma itself
 // as the wrapper statements both share the same parent (i.e., are on the same scope)

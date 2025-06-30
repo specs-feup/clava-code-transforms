@@ -2,6 +2,7 @@
   "include": ["src/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"],
   "compilerOptions": {
+    "rootDir": ".",
     "outDir": "dist",
     "target": "ES2022",
     "module": "NodeNext",
