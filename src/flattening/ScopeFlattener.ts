@@ -1,4 +1,4 @@
-import { Body, FunctionJp, If, Loop, Scope, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { DeclStmt, FunctionJp, Scope, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
@@ -8,7 +8,14 @@ export class ScopeFlattener extends AdvancedTransform {
     }
 
     public flattenScope(scope: Scope, prefix: String): boolean {
-        for (const decl of Query.searchFrom(scope, Vardecl)) {
+        const decls: Vardecl[] = [];
+        for (const child of scope.children) {
+            if (child instanceof DeclStmt) {
+                decls.push(...Query.searchFrom(child, Vardecl).get());
+            }
+        }
+
+        for (const decl of decls) {
             const newName = `${prefix}_${decl.name}`;
 
             for (const ref of Query.searchFrom(scope, Varref, { name: decl.name })) {

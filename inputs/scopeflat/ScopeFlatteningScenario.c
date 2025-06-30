@@ -20,6 +20,8 @@ void foo(int *a, int *b)
             int x2 = 3;
             int x3 = 4;
             int x4 = 5;
+            int a1[5] = {1, 2, 3, 4, 5};
+            int a2[5][1] = {{1}, {2}, {3}, {4}, {5}};
             x0 = x1 + x2;
             x1 = x2 + x3;
             x2 = x3 + x4;
