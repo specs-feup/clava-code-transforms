@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { AdjustedType, ArrayType, BuiltinType, Call, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdjustedType, ArrayType, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
@@ -159,6 +159,10 @@ export class Outliner extends AdvancedTransform {
         this.removeRedundancies(fun);
         this.removeRedundancies(call);
 
+        // ------------------------------------------------------------------------------
+        // Deal with leftover breaks and continues
+        this.removeContinues(fun);
+
         //------------------------------------------------------------------------------
         // Victory, at last
         begin.detach();
@@ -166,6 +170,15 @@ export class Outliner extends AdvancedTransform {
         this.log("Finished cleanup");
 
         return [fun, call];
+    }
+
+    private removeContinues(fun: FunctionJp): void {
+        for (const brk of Query.searchFrom(fun, Continue)) {
+            if (brk.getAncestor("loop") == null) {
+                const returnStmt = ClavaJoinPoints.returnStmt();
+                brk.replaceWith(returnStmt);
+            }
+        }
     }
 
     private removeRedundancies(startingPoint: Joinpoint): void {
