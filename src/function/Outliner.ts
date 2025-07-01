@@ -36,8 +36,6 @@ export class Outliner extends AdvancedTransform {
     public outlineWithWrappers(begin: WrapperStmt, end: WrapperStmt, outlineAllDecls: boolean = false): [FunctionJp, Call] | [null, null] {
         const beginPragma = begin.code.trim().replace(/\s+/g, ' ').replace(";", "");
         const endPragma = end.code.trim().replace(/\s+/g, ' ').replace(";", "");
-        console.log("Begin pragma: " + beginPragma);
-        console.log("End pragma: " + endPragma);
 
         if (!beginPragma.toLowerCase().includes("#pragma clava begin_outline")) {
             this.logError("Provided begin wrapper is not a valid outlining pragma! Begin = " + beginPragma);
@@ -48,7 +46,6 @@ export class Outliner extends AdvancedTransform {
             return [null, null];
         }
         const funName = beginPragma.split(" ")[3] || this.generateFunctionName();
-        console.log(beginPragma.split(" ")[3]);
 
         // we need to get the statements immediately before and after the wrappers
         const beginStmt = begin.siblingsRight[0] as Statement;
@@ -158,10 +155,13 @@ export class Outliner extends AdvancedTransform {
         // Remove some of the redundancies introduced by the outlining process
         this.removeRedundancies(fun);
         this.removeRedundancies(call);
+        this.log("Removed redundancies from the outlined function and the call to it");
 
         // ------------------------------------------------------------------------------
         // Deal with leftover breaks and continues
         this.removeContinues(fun);
+        this.removeBreaks(fun, call);
+        this.log("Removed leftover breaks and continues from the outlined function");
 
         //------------------------------------------------------------------------------
         // Victory, at last
@@ -178,6 +178,46 @@ export class Outliner extends AdvancedTransform {
                 const returnStmt = ClavaJoinPoints.returnStmt();
                 brk.replaceWith(returnStmt);
             }
+        }
+    }
+
+    private removeBreaks(fun: FunctionJp, call: Call): void {
+        const breaks: Break[] = [];
+        for (const brk of Query.searchFrom(fun, Break)) {
+            if (brk.getAncestor("loop") == null) {
+                breaks.push(brk);
+            }
+        }
+        if (breaks.length == 0) {
+            return;
+        }
+        // Create premature exit variable
+        const varName = IdGenerator.next("__prematureExit");
+        const preExitVar = ClavaJoinPoints.varDecl(varName, ClavaJoinPoints.integerLiteral(0));
+        call.insertBefore(preExitVar);
+
+        // Create premature exit arg
+        const preExitVarRef = ClavaJoinPoints.varRef(preExitVar);
+        const preExitVarAddr = ClavaJoinPoints.unaryOp("&", preExitVarRef);
+        call.addArg(preExitVarAddr.code, preExitVarAddr.type);
+
+        // Create early exit test and return
+        const condStmt = ClavaJoinPoints.binaryOp("==", preExitVarRef, ClavaJoinPoints.integerLiteral(1));
+        const breakStmt = ClavaJoinPoints.stmtLiteral("break;");
+        const ifStmt = ClavaJoinPoints.ifStmt(condStmt, ClavaJoinPoints.scope(breakStmt));
+        call.insertAfter(ifStmt);
+
+        // Create premature exit parameter
+        const preExitParam = ClavaJoinPoints.param("_prematureExit", ClavaJoinPoints.type("char*"));
+        fun.addParam(preExitParam.name, preExitParam.type);
+
+        // Replace breaks with premature exit
+        for (const brk of breaks) {
+            const assignStmt = ClavaJoinPoints.stmtLiteral(`*${preExitParam.name} = 1;`);
+            const returnStmt = ClavaJoinPoints.returnStmt();
+
+            brk.insertAfter(returnStmt);
+            brk.replaceWith(assignStmt);
         }
     }
 
