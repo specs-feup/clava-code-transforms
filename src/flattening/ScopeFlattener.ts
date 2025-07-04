@@ -1,13 +1,28 @@
 import { DeclStmt, FunctionJp, Scope, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
+import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 
 export class ScopeFlattener extends AdvancedTransform {
     constructor(silent: boolean = false) {
         super("ScopeFlattener", silent);
     }
 
-    public flattenScope(scope: Scope, prefix: String): boolean {
+    public flattenScope(scope: Scope, prefix: string): number {
+        let n = 0;
+        const innerScopes: Scope[] = [];
+        for (const child of scope.children) {
+            if (child instanceof Scope) {
+                if (!this.isRedundant(child)) {
+                    continue;
+                }
+                innerScopes.push(child);
+            }
+        }
+        innerScopes.forEach(innerScope => {
+            n += this.flattenScope(innerScope, IdGenerator.next(prefix));
+        });
+
         const decls: Vardecl[] = [];
         for (const child of scope.children) {
             if (child instanceof DeclStmt) {
@@ -27,17 +42,19 @@ export class ScopeFlattener extends AdvancedTransform {
             scope.insertBefore(child);
         }
         scope.detach();
-        return true;
+        return n + 1;
     }
 
     public flattenAllInFunction(fun: FunctionJp, prefix: string = "_scope"): number {
         let n = 0;
-        for (const scope of Query.searchFrom(fun, Scope)) {
-            if (!this.isRedundant(scope)) {
-                continue;
+        if (fun.body === undefined) {
+            return n;
+        }
+        const allScopes = Query.searchFrom(fun.body, Scope).get().filter(scope => this.isRedundant(scope));
+        for (const scope of allScopes) {
+            if (scope.parent !== undefined) {
+                n += this.flattenScope(scope, IdGenerator.next(prefix));
             }
-            this.flattenScope(scope, `${prefix}_${n}`);
-            n++;
         }
         return n;
     }
