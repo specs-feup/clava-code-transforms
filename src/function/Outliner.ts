@@ -104,13 +104,13 @@ export class Outliner extends AdvancedTransform {
         this.log("Prologue has " + prologue.length + " statements, and epilogue has " + epilogue.length);
 
         //------------------------------------------------------------------------------
-        const flt = this.flattenScopes(region);
-        if (flt > 0) {
-            this.log("Flattened " + flt + " scope(s) in the outline region");
-        }
-        else {
-            this.log("No scopes were flattened in the outline region");
-        }
+        // const flt = this.flattenScopes(region);
+        // if (flt > 0) {
+        //     this.log("Flattened " + flt + " scope(s) in the outline region");
+        // }
+        // else {
+        //     this.log("No scopes were flattened in the outline region");
+        // }
 
         //------------------------------------------------------------------------------
         const globals = this.findGlobalVars();
@@ -190,7 +190,7 @@ export class Outliner extends AdvancedTransform {
 
         const sf = new ScopeFlattener();
         toFlatten.forEach((scope) => {
-            const prefix = IdGenerator.next("__scope");
+            const prefix = IdGenerator.next("_s");
             sf.flattenScope(scope, prefix);
             this.log(`Flattened scope at line ${scope.line} with prefix "${prefix}"`);
         });
@@ -552,7 +552,7 @@ export class Outliner extends AdvancedTransform {
         return params;
     }
 
-    private findRefsInRegion(region: Statement[]): Varref[] {
+    private findRefsInRegionOld(region: Statement[]): Varref[] {
         const decls = [];
         const declsNames = [];
         for (const stmt of region) {
@@ -561,6 +561,7 @@ export class Outliner extends AdvancedTransform {
                 declsNames.push(decl.name);
             }
         }
+        console.log(declsNames);
 
         const varrefs: Varref[] = [];
         const varrefsNames: string[] = [];
@@ -596,6 +597,58 @@ export class Outliner extends AdvancedTransform {
         }
         this.log("Found " + varrefsNames.length + " external variable references inside outline region");
         return varrefs;
+    }
+
+    private findRefsInRegion(region: Statement[]): Varref[] {
+        const stmtIds: String[] = region.map(stmt => stmt.astId);
+        const varrefs: Varref[] = [];
+
+        for (const stmt of region) {
+            for (const varref of Query.searchFrom(stmt, Varref)) {
+                // may need to filter for other types, like macros, etc
+                // select all varrefs with no matching decl in the region, except globals
+                const isValid = this.isValidVarref(varref);
+                if (isValid) {
+                    varrefs.push(varref);
+                }
+            }
+        }
+
+        const validVarrefs: Varref[] = [];
+        for (const varref of varrefs) {
+            if (!this.declInPath(varref, stmtIds)) {
+                validVarrefs.push(varref);
+            }
+        }
+        const uniqueRefs = new Set();
+        this.log("Found " + uniqueRefs.size + " external variable references inside outline region");
+        return validVarrefs.filter(varref => {
+            if (!uniqueRefs.has(varref.name)) {
+                uniqueRefs.add(varref.name);
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private declInPath(varref: Varref, stmtIds: String[]): boolean {
+        if (varref.vardecl === undefined) {
+            return false;
+        }
+
+        // In the future, when we want to pass globals through the signature, start by modifying this
+        if (varref.vardecl.isGlobal) {
+            return true;
+        }
+        const decl = varref.vardecl;
+        let parent = decl.parent;
+        while (parent !== undefined && parent.joinPointType !== "function") {
+            if (stmtIds.includes(parent.astId)) {
+                return true;
+            }
+            parent = parent.parent;
+        }
+        return false;
     }
 
     private isValidVarref(varref: Varref): boolean {
