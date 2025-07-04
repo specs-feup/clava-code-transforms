@@ -1,8 +1,9 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { AdjustedType, ArrayType, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdjustedType, ArrayType, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Scope, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
+import { ScopeFlattener } from "../flattening/ScopeFlattener.js";
 
 export class Outliner extends AdvancedTransform {
     private defaultPrefix: string;
@@ -103,6 +104,15 @@ export class Outliner extends AdvancedTransform {
         this.log("Prologue has " + prologue.length + " statements, and epilogue has " + epilogue.length);
 
         //------------------------------------------------------------------------------
+        const flt = this.flattenScopes(region);
+        if (flt > 0) {
+            this.log("Flattened " + flt + " scope(s) in the outline region");
+        }
+        else {
+            this.log("No scopes were flattened in the outline region");
+        }
+
+        //------------------------------------------------------------------------------
         const globals = this.findGlobalVars();
         this.log("Found " + globals.length + " global variable(s)");
 
@@ -170,6 +180,21 @@ export class Outliner extends AdvancedTransform {
         this.log("Finished cleanup");
 
         return [fun, call];
+    }
+
+    private flattenScopes(region: Statement[]): number {
+        const toFlatten: Scope[] = [];
+        for (const stmt of region) {
+            toFlatten.push(...Query.searchFromInclusive(stmt, Scope).get().filter((s) => s.joinPointType !== "body"));
+        }
+
+        const sf = new ScopeFlattener();
+        toFlatten.forEach((scope) => {
+            const prefix = IdGenerator.next("__scope");
+            sf.flattenScope(scope, prefix);
+            this.log(`Flattened scope at line ${scope.line} with prefix "${prefix}"`);
+        });
+        return toFlatten.length;
     }
 
     private removeContinues(fun: FunctionJp): void {

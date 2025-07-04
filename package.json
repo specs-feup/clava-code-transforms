@@ -39,6 +39,7 @@
     "./FoldingPropagationCombiner": "./dist/src/constfolding/FoldingPropagationCombiner.js",
     "./ArrayFlattener": "./dist/src/flattening/ArrayFlattener.js",
     "./StructFlattener": "./dist/src/flattening/StructFlattener.js",
+    "./ScopeFlattener": "./dist/src/flattening/ScopeFlattener.js",
     "./Outliner": "./dist/src/function/Outliner.js",
     "./Voidifier": "./dist/src/function/Voidifier.js",
     "./LoopCharacterizer": "./dist/src/loop/LoopCharacterizer.js",

@@ -24,6 +24,7 @@ void intenseArithmeticFunction()
 
         for (int j = 1; j <= 100; j++)
         {
+            int x;
             a = (a * j + 7) % 123;
             b = (b + j * 2 - a) % 321;
             c = (c ^ (a + b)) % 213;
@@ -37,10 +38,25 @@ void intenseArithmeticFunction()
             {
                 continue; // occasional skip
             }
+            {
+                int x;
+                x = 1;
+            }
             if (j % 17 == 0)
             {
                 a = (a + b - c * d + e) % 1000; // special case
                 break;
+            }
+
+            for (x = 0; x < 10; x++)
+            {
+                a = (a + b * c - d) % 1000;
+                b = (b * 3 + a - e * 2) % 1000;
+                c = (c + b / (a + 1)) % 1000;
+                d = (d + c * b - a / 2) % 1000;
+                e = (e * 5 + d - c) % 1000;
+
+                sum += a + b + c + d + e;
             }
 
             for (int k = 1; k <= 20; k++)
