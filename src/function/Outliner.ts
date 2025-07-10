@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { AdjustedType, ArrayType, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Scope, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdjustedType, ArrayType, BinaryOp, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Scope, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
@@ -173,6 +173,10 @@ export class Outliner extends AdvancedTransform {
         this.removeBreaks(fun, call);
         this.log("Removed leftover breaks and continues from the outlined function");
 
+        //  ------------------------------------------------------------------------------
+        // Apply some final transformations to solve edge cases
+        this.transformPointerReassignments(fun, call);
+
         //------------------------------------------------------------------------------
         // Victory, at last
         begin.detach();
@@ -180,6 +184,43 @@ export class Outliner extends AdvancedTransform {
         this.log("Finished cleanup");
 
         return [fun, call];
+    }
+
+    private transformPointerReassignments(fun: FunctionJp, call: Call): void {
+        const reassignedPointerParams: Param[] = [];
+
+        fun.params.forEach((param) => {
+            if (param.type instanceof PointerType) {
+                for (const varref of Query.searchFrom(fun.body, Varref, { name: param.name })) {
+                    if (varref.parent instanceof BinaryOp) {
+                        const binOp = varref.parent as BinaryOp;
+                        if (binOp.isAssignment && binOp.left.code === varref.code) {
+                            reassignedPointerParams.push(param);
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+        reassignedPointerParams.forEach((param) => {
+            // Dereference every reference
+            for (const varref of Query.searchFrom(fun, Varref, { name: param.name })) {
+                const derefOp = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", varref));
+                varref.replaceWith(derefOp);
+            }
+            // Change parameter to have another layer of indirection
+            const oldType = param.type;
+            const newType = ClavaJoinPoints.type(`${oldType.code}*`);
+            param.setType(newType);
+
+            // Change argument in the call
+            const idx = fun.params.findIndex((p) => p.name === param.name);
+            const arg = call.argList[idx];
+            const addrOf = ClavaJoinPoints.unaryOp("&", ClavaJoinPoints.parenthesis(arg));
+            call.setArg(idx, addrOf);
+
+            this.log(`Transformed parameter "${param.name}" to a pointer to a pointer type`);
+        });
     }
 
     private flattenScopes(region: Statement[]): number {
