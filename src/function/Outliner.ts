@@ -552,53 +552,6 @@ export class Outliner extends AdvancedTransform {
         return params;
     }
 
-    private findRefsInRegionOld(region: Statement[]): Varref[] {
-        const decls = [];
-        const declsNames = [];
-        for (const stmt of region) {
-            for (const decl of Query.searchFrom(stmt, Vardecl)) {
-                decls.push(decl);
-                declsNames.push(decl.name);
-            }
-        }
-        console.log(declsNames);
-
-        const varrefs: Varref[] = [];
-        const varrefsNames: string[] = [];
-
-        for (const stmt of region) {
-            for (const varref of Query.searchFrom(stmt, Varref)) {
-                // may need to filter for other types, like macros, etc
-                // select all varrefs with no matching decl in the region, except globals
-                try {
-                    const isValid = this.isValidVarref(varref);
-                    if (!isValid) {
-                        continue;
-                    }
-
-                    const condA = !varrefsNames.includes(varref.name);
-                    const condB = !declsNames.includes(varref.name);
-                    const condC = !varref.vardecl.isGlobal;
-
-                    if (condA && condB && condC) {
-                        varrefs.push(varref);
-                        varrefsNames.push(varref.name);
-                    }
-                } catch (e) {
-                    if (e instanceof Error) {
-                        this.logError(e.stack as string);
-                    }
-                    else {
-                        this.logError("(No stack trace available)");
-                    }
-                    this.logError("Exception while fetching varref with code " + varref.code);
-                }
-            }
-        }
-        this.log("Found " + varrefsNames.length + " external variable references inside outline region");
-        return varrefs;
-    }
-
     private findRefsInRegion(region: Statement[]): Varref[] {
         const stmtIds: String[] = region.map(stmt => stmt.astId);
         const varrefs: Varref[] = [];
