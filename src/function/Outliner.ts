@@ -209,7 +209,7 @@ export class Outliner extends AdvancedTransform {
     private removeBreaks(fun: FunctionJp, call: Call): void {
         const breaks: Break[] = [];
         for (const brk of Query.searchFrom(fun, Break)) {
-            if (brk.getAncestor("loop") == null) {
+            if (brk.getAncestor("loop") == null && brk.getAncestor("switch") == null) {
                 breaks.push(brk);
             }
         }
@@ -228,8 +228,8 @@ export class Outliner extends AdvancedTransform {
 
         // Create early exit test and return
         const condStmt = ClavaJoinPoints.binaryOp("==", preExitVarRef, ClavaJoinPoints.integerLiteral(1));
-        const breakStmt = ClavaJoinPoints.stmtLiteral("break;");
-        const ifStmt = ClavaJoinPoints.ifStmt(condStmt, ClavaJoinPoints.scope(breakStmt));
+        const breakOrReturnStmt = call.getAncestor("loop") ? ClavaJoinPoints.stmtLiteral("break;") : ClavaJoinPoints.returnStmt();
+        const ifStmt = ClavaJoinPoints.ifStmt(condStmt, ClavaJoinPoints.scope(breakOrReturnStmt));
         call.insertAfter(ifStmt);
 
         // Create premature exit parameter
