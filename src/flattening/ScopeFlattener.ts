@@ -50,7 +50,12 @@ export class ScopeFlattener extends AdvancedTransform {
         if (fun.body === undefined) {
             return n;
         }
-        const allScopes = Query.searchFrom(fun.body, Scope).get().filter(scope => this.isRedundant(scope));
+        let allScopes = Query.searchFrom(fun.body, Scope).get().filter(scope => this.isRedundant(scope));
+
+        console.log(allScopes.map(scope => scope.line));
+        this.sortScopes(allScopes);
+        console.log(allScopes.map(scope => scope.line));
+
         for (const scope of allScopes) {
             if (scope.parent !== undefined) {
                 n += this.flattenScope(scope, IdGenerator.next(prefix));
@@ -61,5 +66,28 @@ export class ScopeFlattener extends AdvancedTransform {
 
     public isRedundant(scope: Scope): boolean {
         return scope.joinPointType !== "body";
+    }
+
+    private sortScopes(scopes: Scope[]): void {
+        scopes.sort((s1, s2) => {
+            // if s1 is a descendant of s2, s1 > s2, return 1
+            const cond1 = Query.searchFrom(s1, Scope).get().some(sc => {
+                console.log("Bingo");
+                return sc.line === s2.line;
+            });
+            if (cond1) {
+                return 1;
+            }
+            // if s2 is a descendant of s1, s1 < s2, return -1
+            const cond2 = Query.searchFrom(s2, Scope).get().some(sc => {
+                console.log("Bingo2");
+                return sc.line === s1.line;
+            });
+            if (cond2) {
+                return -1;
+            }
+            // otherwise, return 0
+            return 0;
+        });
     }
 }
