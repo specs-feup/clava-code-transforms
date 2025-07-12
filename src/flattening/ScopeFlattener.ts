@@ -72,7 +72,6 @@ export class ScopeFlattener extends AdvancedTransform {
         scopes.sort((s1, s2) => {
             // if s1 is a descendant of s2, s1 > s2, return 1
             const cond1 = Query.searchFrom(s1, Scope).get().some(sc => {
-                console.log("Bingo");
                 return sc.line === s2.line;
             });
             if (cond1) {
@@ -80,7 +79,6 @@ export class ScopeFlattener extends AdvancedTransform {
             }
             // if s2 is a descendant of s1, s1 < s2, return -1
             const cond2 = Query.searchFrom(s2, Scope).get().some(sc => {
-                console.log("Bingo2");
                 return sc.line === s1.line;
             });
             if (cond2) {
