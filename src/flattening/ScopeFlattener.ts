@@ -51,10 +51,7 @@ export class ScopeFlattener extends AdvancedTransform {
             return n;
         }
         let allScopes = Query.searchFrom(fun.body, Scope).get().filter(scope => this.isRedundant(scope));
-
-        console.log(allScopes.map(scope => scope.line));
         this.sortScopes(allScopes);
-        console.log(allScopes.map(scope => scope.line));
 
         for (const scope of allScopes) {
             if (scope.parent !== undefined) {
