@@ -26,7 +26,7 @@ export abstract class AdvancedTransform {
     }
 
     protected log(msg: string, level: "INFO" | "WARN" | "ERROR" = "INFO") {
-        if (this.silent) {
+        if (this.silent && level === "INFO") {
             return;
         }
 
