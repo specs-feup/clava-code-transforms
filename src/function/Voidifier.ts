@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Loop, MemberAccess, Param, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { ArrayAccess, BinaryOp, Break, Call, Expression, ExprStmt, FunctionJp, If, Loop, MemberAccess, Param, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
