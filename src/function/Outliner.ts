@@ -574,9 +574,14 @@ export class Outliner extends AdvancedTransform {
             const name = ref.name;
             const varType = ref.type;
 
-
-            if (varType instanceof ArrayType || varType instanceof AdjustedType || varType instanceof PointerType) {
+            if (varType instanceof AdjustedType || varType instanceof PointerType) {
                 const param = ClavaJoinPoints.param(name, varType);
+                params.push(param);
+            }
+            else if (varType instanceof ArrayType) {
+                const baseType = varType.code.split("[")[0].trim();
+                const newType = ClavaJoinPoints.pointer(ClavaJoinPoints.type(baseType));
+                const param = ClavaJoinPoints.param(name, newType);
                 params.push(param);
             }
             // unsure if typedefType is always a scalar
