@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { AdjustedType, ArrayType, BinaryOp, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, If, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Scope, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdjustedType, ArrayType, BinaryOp, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, If, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, QualType, ReturnStmt, Scope, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
@@ -577,7 +577,7 @@ export class Outliner extends AdvancedTransform {
                             const newVarref = ClavaJoinPoints.varRef(param);
                             varref.replaceWith(newVarref);
                         }
-                        if (varref.type instanceof BuiltinType || varref.type instanceof TypedefType) {
+                        if (varref.type instanceof BuiltinType || varref.type instanceof TypedefType || varref.type instanceof QualType) {
                             const newVarref = ClavaJoinPoints.varRef(param);
 
                             if (varref.parent != undefined && varref.parent instanceof MemberAccess) {
@@ -619,6 +619,12 @@ export class Outliner extends AdvancedTransform {
                 const param = ClavaJoinPoints.param(name, newType);
                 params.push(param);
             }
+            else if (varType instanceof QualType) {
+                this.logWarning(`Found semi-supported type class "${varType.joinPointType}" for C/C++ type ${varType.code}`);
+                const newType = ClavaJoinPoints.pointer(varType);
+                const param = ClavaJoinPoints.param(name, newType);
+                params.push(param);
+            }
             else {
                 this.logWarning(`Unsupported param type "${varType.joinPointType}" for C/C++ type ${varType.code}`);
             }
@@ -628,7 +634,6 @@ export class Outliner extends AdvancedTransform {
     }
 
     private findRefsInRegion(region: Statement[]): Varref[] {
-        const stmtIds: String[] = region.map(stmt => stmt.astId);
         const varrefs: Varref[] = [];
 
         for (const stmt of region) {
@@ -672,26 +677,6 @@ export class Outliner extends AdvancedTransform {
             if (Query.searchFrom(stmt, Vardecl, { name: varref.name }).get().length > 0) {
                 return true;
             }
-        }
-        return false;
-    }
-
-    private declInPath(varref: Varref, stmtIds: String[]): boolean {
-        if (varref.vardecl === undefined) {
-            return false;
-        }
-
-        // In the future, when we want to pass globals through the signature, start by modifying this
-        if (varref.vardecl.isGlobal) {
-            return true;
-        }
-        const decl = varref.vardecl;
-        let parent = decl.parent;
-        while (parent !== undefined && parent.joinPointType !== "function") {
-            if (stmtIds.includes(parent.astId)) {
-                return true;
-            }
-            parent = parent.parent;
         }
         return false;
     }
