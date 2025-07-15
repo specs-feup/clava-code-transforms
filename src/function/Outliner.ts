@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { AdjustedType, ArrayType, BinaryOp, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Scope, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdjustedType, ArrayType, BinaryOp, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, If, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Scope, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
@@ -171,6 +171,7 @@ export class Outliner extends AdvancedTransform {
         // Deal with leftover breaks and continues
         this.removeContinues(fun);
         this.removeBreaks(fun, call);
+        this.cleanupBreaks(fun);
         this.log("Removed leftover breaks and continues from the outlined function");
 
         //  ------------------------------------------------------------------------------
@@ -243,6 +244,34 @@ export class Outliner extends AdvancedTransform {
             if (brk.getAncestor("loop") == null) {
                 const returnStmt = ClavaJoinPoints.returnStmt();
                 brk.replaceWith(returnStmt);
+            }
+        }
+    }
+
+    // fixes some edge cases where we may end up with top-level code like
+    // if(__prematureExit0 == 1) { break; }
+    private cleanupBreaks(fun: FunctionJp): void {
+        for (const stmt of fun.body.stmts) {
+            if (stmt instanceof Break) {
+                const returnStmt = ClavaJoinPoints.returnStmt();
+                stmt.replaceWith(returnStmt);
+            }
+
+            if (stmt instanceof If) {
+                for (const innerStmt of stmt.then.stmts) {
+                    if (innerStmt.code == "break;") {
+                        const returnStmt = ClavaJoinPoints.returnStmt();
+                        innerStmt.replaceWith(returnStmt);
+                    }
+                }
+                if (stmt.else != null) {
+                    for (const innerStmt of stmt.else.stmts) {
+                        if (innerStmt.code == "break;") {
+                            const returnStmt = ClavaJoinPoints.returnStmt();
+                            innerStmt.replaceWith(returnStmt);
+                        }
+                    }
+                }
             }
         }
     }
