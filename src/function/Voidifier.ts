@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Loop, Param, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Loop, MemberAccess, Param, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
@@ -119,7 +119,13 @@ export class Voidifier extends AdvancedTransform {
         else if (lhs instanceof UnaryOp && lhs.kind == "deref") {
             newArg = lhs.children[0] as Expression;
         }
+        else if (lhs instanceof MemberAccess) {
+            newArg = this.getArgumentFromLhs(lhs.children[0] as Expression);
+        }
         else {
+            console.log(lhs.code);
+            console.log(lhs.joinPointType);
+            this.logError("Unsupported lvalue type: " + lhs.joinPointType + " (" + lhs.code + ")");
             throw new Error("Unsupported lvalue type");
         }
         return newArg;
