@@ -615,7 +615,8 @@ export class Outliner extends AdvancedTransform {
 
         const validVarrefs: Varref[] = [];
         for (const varref of varrefs) {
-            if (!this.declInPath(varref, stmtIds)) {
+            //if (!this.declInPath(varref, stmtIds)) {
+            if (!this.declInRegion(varref, region)) {
                 validVarrefs.push(varref);
             }
         }
@@ -628,6 +629,22 @@ export class Outliner extends AdvancedTransform {
             }
             return false;
         });
+    }
+
+    private declInRegion(varref: Varref, region: Statement[]): boolean {
+        if (varref.vardecl === undefined) {
+            return false;
+        }
+        if (varref.vardecl.isGlobal) {
+            return true;
+        }
+
+        for (const stmt of region) {
+            if (Query.searchFrom(stmt, Vardecl, { name: varref.name }).get().length > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private declInPath(varref: Varref, stmtIds: String[]): boolean {
