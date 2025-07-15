@@ -303,7 +303,7 @@ export class Outliner extends AdvancedTransform {
         call.insertAfter(ifStmt);
 
         // Create premature exit parameter
-        const preExitParam = ClavaJoinPoints.param("_prematureExit", ClavaJoinPoints.type("char*"));
+        const preExitParam = ClavaJoinPoints.param("_prematureExit", ClavaJoinPoints.type("int*"));
         fun.addParam(preExitParam.name, preExitParam.type);
 
         // Replace breaks with premature exit
