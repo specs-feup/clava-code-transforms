@@ -137,7 +137,7 @@ export class Outliner extends AdvancedTransform {
         //------------------------------------------------------------------------------
         const referencedInRegion = this.findRefsInRegion(region);
         const funParams = this.createParams(referencedInRegion);
-        const fun = this.createFunction(functionName, region, funParams);
+        const fun = this.createFunction(functionName, region, funParams, referencedInRegion);
         this.log("Successfully created function \"" + functionName + "\"");
 
         //------------------------------------------------------------------------------
@@ -206,6 +206,9 @@ export class Outliner extends AdvancedTransform {
         reassignedPointerParams.forEach((param) => {
             // Dereference every reference
             for (const varref of Query.searchFrom(fun, Varref, { name: param.name })) {
+                if (varref.type.code !== param.type.code) {
+                    continue;
+                }
                 const derefOp = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", varref));
                 varref.replaceWith(derefOp);
             }
@@ -496,7 +499,7 @@ export class Outliner extends AdvancedTransform {
                     const ref = ClavaJoinPoints.varRef(decl);
 
                     if (param.type instanceof PointerType) {
-                        if (ref.type instanceof BuiltinType || ref.type instanceof TypedefType || ref.type instanceof ElaboratedType) {
+                        if (ref.type instanceof BuiltinType || ref.type instanceof TypedefType || ref.type instanceof ElaboratedType || ref.type instanceof QualType) {
                             const addressOfScalar = ClavaJoinPoints.unaryOp("&", ref);
                             args.push(addressOfScalar);
                         }
@@ -515,7 +518,7 @@ export class Outliner extends AdvancedTransform {
         return args;
     }
 
-    private createFunction(name: string, region: Statement[], params: Param[]): FunctionJp {
+    private createFunction(name: string, region: Statement[], params: Param[], varrefs: Varref[]): FunctionJp {
         let oldFun: Joinpoint = region[0];
         while (!(oldFun instanceof FunctionJp)) {
             oldFun = oldFun.parent;
@@ -550,7 +553,7 @@ export class Outliner extends AdvancedTransform {
         }
 
         // make sure scalar refs are now dereferenced pointers to params
-        this.scalarsToPointers(region, params);
+        this.scalarsToPointers(region, params, varrefs);
         return fun;
     }
 
@@ -566,10 +569,10 @@ export class Outliner extends AdvancedTransform {
         return returnStmts;
     }
 
-    private scalarsToPointers(region: Statement[], params: Param[]) {
+    private scalarsToPointers(region: Statement[], params: Param[], varrefs: Varref[]): void {
         for (const stmt of region) {
 
-            for (const varref of Query.searchFrom(stmt, Varref)) {
+            for (const varref of varrefs) {
 
                 for (const param of params) {
                     if (param.name === varref.name) {
@@ -598,9 +601,14 @@ export class Outliner extends AdvancedTransform {
 
     private createParams(varrefs: Varref[]): Param[] {
         const params: Param[] = [];
+        const uniqueNames = new Set();
 
         for (const ref of varrefs) {
             const name = ref.name;
+            if (uniqueNames.has(name)) {
+                continue;
+            }
+            uniqueNames.add(name);
             const varType = ref.type;
 
             if (varType instanceof AdjustedType || varType instanceof PointerType) {
@@ -654,15 +662,17 @@ export class Outliner extends AdvancedTransform {
                 validVarrefs.push(varref);
             }
         }
-        const uniqueRefs = new Set();
-        this.log("Found " + uniqueRefs.size + " external variable references inside outline region");
-        return validVarrefs.filter(varref => {
-            if (!uniqueRefs.has(varref.name)) {
-                uniqueRefs.add(varref.name);
-                return true;
-            }
-            return false;
-        });
+        // const uniqueRefs = new Set();
+        // this.log("Found " + uniqueRefs.size + " external variable references inside outline region");
+        // return validVarrefs.filter(varref => {
+        //     if (!uniqueRefs.has(varref.name)) {
+        //         uniqueRefs.add(varref.name);
+        //         return true;
+        //     }
+        //     return false;
+        // });
+        this.log("Found " + validVarrefs.length + " external variable reference(s) inside outline region");
+        return validVarrefs;
     }
 
     private declInRegion(varref: Varref, region: Statement[]): boolean {
@@ -672,10 +682,33 @@ export class Outliner extends AdvancedTransform {
         if (varref.vardecl.isGlobal) {
             return true;
         }
+        const stmtIds = region.map(stmt => stmt.astId);
+        let varrefStmtId = "";
+        let varrefParent: Joinpoint = varref;
+        while (varrefParent != null) {
+            if (stmtIds.includes(varrefParent.astId)) {
+                varrefStmtId = varrefParent.astId;
+                break;
+            }
+            varrefParent = varrefParent.getAncestor("statement");
+        }
 
         for (const stmt of region) {
-            if (Query.searchFrom(stmt, Vardecl, { name: varref.name }).get().length > 0) {
-                return true;
+            for (const decl of Query.searchFrom(stmt, Vardecl, { name: varref.name })) {
+                let declStmtId = "";
+                let declParent: Joinpoint = decl;
+                while (declParent != null) {
+                    if (stmtIds.includes(declParent.astId)) {
+                        declStmtId = declParent.astId;
+                        break;
+                    }
+                    declParent = declParent.getAncestor("statement");
+                }
+                const varrefStmtIdx = stmtIds.indexOf(varrefStmtId);
+                const declStmtIdx = stmtIds.indexOf(declStmtId);
+                if (declStmtIdx >= 0 && varrefStmtIdx >= 0 && declStmtIdx <= varrefStmtIdx) {
+                    return true;
+                }
             }
         }
         return false;
