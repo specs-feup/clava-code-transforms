@@ -10,6 +10,8 @@ export class Voidifier extends AdvancedTransform {
     }
 
     public voidify(fun: FunctionJp, returnVarName = "rtr_value"): boolean {
+        const calls = Query.search(Call, { "signature": fun.signature }).get();
+
         const returnStmts = this.findNonvoidReturnStmts(fun);
         if (returnStmts.length == 0) {
             return false;
@@ -23,9 +25,9 @@ export class Voidifier extends AdvancedTransform {
 
         this.voidifyFunction(fun, returnStmts, returnVarName, retVarType);
 
-        for (const call of Query.search(Call, { "signature": fun.signature })) {
+        calls.forEach((call) => {
             this.handleCall(call, fun, retVarType);
-        }
+        });
 
         this.log(`Voidified function ${fun.name}`);
         return true;
