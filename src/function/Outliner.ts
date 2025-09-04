@@ -1,5 +1,5 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { AdjustedType, ArrayType, BinaryOp, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, If, Joinpoint, LabelStmt, MemberAccess, Param, ParenExpr, PointerType, QualType, ReturnStmt, Scope, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
+import { AdjustedType, ArrayType, BinaryOp, Break, BuiltinType, Call, Continue, DeclStmt, ElaboratedType, Expression, FunctionJp, GotoStmt, If, Joinpoint, LabelStmt, Literal, MemberAccess, Param, ParenExpr, PointerType, QualType, ReturnStmt, Scope, Statement, TypedefType, UnaryOp, Vardecl, Varref, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
@@ -403,8 +403,11 @@ export class Outliner extends AdvancedTransform {
 
         // actions before the function call
         //const type = returnStmts[0].children[0].type;
-        const varref = Query.searchFrom(returnStmts[0], Varref).first()!;
-        const type = varref.type;
+        const varref = Query.searchFrom(returnStmts[0], Varref).get()[0] || null;
+        const literal = Query.searchFrom(returnStmts[0], Literal).get()[0] || null;
+        const retVal = varref || literal;
+        const type = retVal.type;
+
         const resId = IdGenerator.next("__rtr_val_");
         const resVar = ClavaJoinPoints.varDeclNoInit(resId, type);
 
@@ -427,10 +430,13 @@ export class Outliner extends AdvancedTransform {
         for (const ret of returnStmts) {
             const derefResVarParam = ClavaJoinPoints.unaryOp("*", resVarParam.varref());
             const wrappedDerefResVarParam = ClavaJoinPoints.parenthesis(derefResVarParam);
-            const retVal = ret.children[0] as Expression;
-            retVal.detach();
-            const derefRetVal = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", retVal));
-            const op1 = ClavaJoinPoints.binaryOp("=", wrappedDerefResVarParam, derefRetVal, resVarParam.type);
+            const retExpr = ret.children[0] as Expression;
+            retExpr.detach();
+
+            const refRetVal = retExpr.type.isPointer ?
+                ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", retExpr)) :
+                ClavaJoinPoints.parenthesis(retExpr);
+            const op1 = ClavaJoinPoints.binaryOp("=", wrappedDerefResVarParam, refRetVal, resVarParam.type);
             ret.insertBefore(ClavaJoinPoints.exprStmt(op1));
 
             const boolVarParam = fun.params[fun.params.length - 1];
