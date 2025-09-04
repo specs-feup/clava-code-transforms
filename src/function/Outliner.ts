@@ -402,7 +402,9 @@ export class Outliner extends AdvancedTransform {
         }
 
         // actions before the function call
-        const type = returnStmts[0].children[0].type;
+        //const type = returnStmts[0].children[0].type;
+        const varref = Query.searchFrom(returnStmts[0], Varref).first()!;
+        const type = varref.type;
         const resId = IdGenerator.next("__rtr_val_");
         const resVar = ClavaJoinPoints.varDeclNoInit(resId, type);
 
@@ -420,12 +422,15 @@ export class Outliner extends AdvancedTransform {
         fun.addParam(params[0].name, params[0].type);
         fun.addParam(params[1].name, params[1].type);
 
+        const resVarParam = fun.params[fun.params.length - 2];
+
         for (const ret of returnStmts) {
-            const resVarParam = fun.params[fun.params.length - 2];
-            const derefResVarParam = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", resVarParam.varref()));
+            const derefResVarParam = ClavaJoinPoints.unaryOp("*", resVarParam.varref());
+            const wrappedDerefResVarParam = ClavaJoinPoints.parenthesis(derefResVarParam);
             const retVal = ret.children[0] as Expression;
             retVal.detach();
-            const op1 = ClavaJoinPoints.binaryOp("=", derefResVarParam, retVal, resVarParam.type);
+            const derefRetVal = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", retVal));
+            const op1 = ClavaJoinPoints.binaryOp("=", wrappedDerefResVarParam, derefRetVal, resVarParam.type);
             ret.insertBefore(ClavaJoinPoints.exprStmt(op1));
 
             const boolVarParam = fun.params[fun.params.length - 1];
