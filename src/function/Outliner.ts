@@ -142,7 +142,7 @@ export class Outliner extends AdvancedTransform {
 
         //------------------------------------------------------------------------------
         const callArgs = this.createArgs(fun, prologue, parentFun);
-        let call = this.createCall(callPlaceholder, fun, callArgs);
+        let call = this.updateCall(callPlaceholder, fun, callArgs);
         this.log("Successfully created call to \"" + functionName + "\"");
 
         //------------------------------------------------------------------------------
@@ -394,7 +394,7 @@ export class Outliner extends AdvancedTransform {
         return !gotoLabels.every(label => labels.includes(label));
     }
 
-    private ensureVoidReturn(fun: FunctionJp, call: Call): Call | null {
+    private ensureVoidReturnOld(fun: FunctionJp, call: Call): Call | null {
         const returnStmts = this.findNonvoidReturnStmts([fun]);
 
         if (returnStmts.length == 0) {
@@ -430,19 +430,22 @@ export class Outliner extends AdvancedTransform {
         for (const ret of returnStmts) {
             const derefResVarParam = ClavaJoinPoints.unaryOp("*", resVarParam.varref());
             const wrappedDerefResVarParam = ClavaJoinPoints.parenthesis(derefResVarParam);
+
             const retExpr = ret.children[0] as Expression;
             retExpr.detach();
-
             const refRetVal = retExpr.type.isPointer ?
                 ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", retExpr)) :
-                ClavaJoinPoints.parenthesis(retExpr);
+                retExpr;
+
             const op1 = ClavaJoinPoints.binaryOp("=", wrappedDerefResVarParam, refRetVal, resVarParam.type);
             ret.insertBefore(ClavaJoinPoints.exprStmt(op1));
 
             const boolVarParam = fun.params[fun.params.length - 1];
             const newVarref = ClavaJoinPoints.varRef(boolVarParam);
             const derefBoolVarParam = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", newVarref));
+
             const trueVal = ClavaJoinPoints.integerLiteral(1);
+
             const op2 = ClavaJoinPoints.binaryOp("=", derefBoolVarParam, trueVal, boolVarParam.type);
             ret.insertBefore(op2);
         }
@@ -453,16 +456,81 @@ export class Outliner extends AdvancedTransform {
         const resVarAddr = ClavaJoinPoints.unaryOp("&", resVarRef);
         const boolVarAddr = ClavaJoinPoints.unaryOp("&", boolVarRef);
         const allArgs = call.argList.concat([resVarAddr, boolVarAddr]);
-        call = this.createCall(call, fun, allArgs);
+        call = this.updateCall(call, fun, allArgs);
 
         // actions after the function call
-        const returnStmt = ClavaJoinPoints.returnStmt(resVarRef);
+        const caller = call.getAncestor("function") as FunctionJp;
+
+        const resVarIsPointer = resVar.type.isPointer;
+        const resVarBaseType = this.simpleType(resVar.type);
+        const callerRetBaseType = this.simpleType(caller.type);
+        let returnStmt: ReturnStmt;
+        if (caller.type.code != resVar.type.code && resVarIsPointer && resVarBaseType == callerRetBaseType) {
+            console.log(caller.type.code + " != " + resVar.type.code);
+            const derefResVar = ClavaJoinPoints.unaryOp("*", resVarRef);
+            returnStmt = ClavaJoinPoints.returnStmt(derefResVar);
+        }
+        else {
+            returnStmt = ClavaJoinPoints.returnStmt(resVarRef);
+        }
         const scope = ClavaJoinPoints.scope();
         scope.setFirstChild(returnStmt);
         const ifStmt = ClavaJoinPoints.ifStmt(boolVarRef, scope);
         call.insertAfter(ifStmt);
 
         return call;
+    }
+
+    private ensureVoidReturn(fun: FunctionJp, call: Call): Call | null {
+        const returnStmts = this.findNonvoidReturnStmts([fun]);
+        if (returnStmts.length == 0) {
+            return null;
+        }
+
+        const [returnValDecl, returnBoolDecl] = this.buildVoidReturnCallCheck(call);
+
+        const newCall = this.updateCallForVoidReturn(fun, call, returnValDecl, returnBoolDecl);
+    }
+
+    private buildVoidReturnCallCheck(call: Call): [Vardecl, Vardecl] {
+        const caller = call.getAncestor("function") as FunctionJp;
+        const callerRetType = caller.type;
+
+        const returnValName = IdGenerator.next("__rtr_val_");
+        const returnValDecl = ClavaJoinPoints.varDeclNoInit(returnValName, callerRetType);
+        call.insertBefore(returnValDecl);
+
+        const returnBoolName = IdGenerator.next("__rtr_flag_");
+        const returnBoolDecl = ClavaJoinPoints.varDecl(returnBoolName, ClavaJoinPoints.integerLiteral(0));
+        call.insertBefore(returnBoolDecl);
+
+        const returnValRef = returnValDecl.varref();
+        const returnBoolRef = returnBoolDecl.varref();
+
+        const returnStmt = ClavaJoinPoints.returnStmt(returnValRef);
+        const scope = ClavaJoinPoints.scope();
+        scope.setFirstChild(returnStmt);
+        const ifStmt = ClavaJoinPoints.ifStmt(returnBoolRef, scope);
+        call.insertAfter(ifStmt);
+
+        return [returnValDecl, returnBoolDecl];
+    }
+
+    private updateCallForVoidReturn(fun: FunctionJp, call: Call, returnValDecl: Vardecl, returnBoolDecl: Vardecl): Call {
+        const returnValPointerType = ClavaJoinPoints.pointer(returnValDecl.type);
+        const returnBoolPointerType = ClavaJoinPoints.pointer(returnBoolDecl.type);
+
+        const returnValParam = ClavaJoinPoints.param(returnValDecl.name, returnValPointerType);
+        fun.addParam(returnValParam.name, returnValParam.type);
+        const returnBoolParam = ClavaJoinPoints.param(returnBoolDecl.name, returnBoolPointerType);
+        fun.addParam(returnBoolParam.name, returnBoolParam.type);
+
+        const newArgList = call.argList.concat([
+            ClavaJoinPoints.unaryOp("&", returnValDecl.varref()),
+            ClavaJoinPoints.unaryOp("&", returnBoolDecl.varref())
+        ]);
+        const newCall = this.updateCall(call, fun, newArgList);
+        return newCall;
     }
 
     private wrapBeginAndEnd(begin: Statement, end: Statement): [Statement, Statement] {
@@ -483,9 +551,9 @@ export class Outliner extends AdvancedTransform {
         return globals;
     }
 
-    private createCall(placeholder: Statement | Call, fun: FunctionJp, args: Expression[]): Call {
+    private updateCall(oldCall: Statement | Call, fun: FunctionJp, args: Expression[]): Call {
         const call = ClavaJoinPoints.call(fun, ...args);
-        placeholder.replaceWith(call);
+        oldCall.replaceWith(call);
         return call;
     }
 
