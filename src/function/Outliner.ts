@@ -394,93 +394,6 @@ export class Outliner extends AdvancedTransform {
         return !gotoLabels.every(label => labels.includes(label));
     }
 
-    private ensureVoidReturnOld(fun: FunctionJp, call: Call): Call | null {
-        const returnStmts = this.findNonvoidReturnStmts([fun]);
-
-        if (returnStmts.length == 0) {
-            return null;
-        }
-
-        // actions before the function call
-        //const type = returnStmts[0].children[0].type;
-        const varref = Query.searchFrom(returnStmts[0], Varref).get()[0] || null;
-        const literal = Query.searchFrom(returnStmts[0], Literal).get()[0] || null;
-        const retVal = varref || literal;
-        const type = retVal.type;
-
-        const resId = IdGenerator.next("__rtr_val_");
-        const resVar = ClavaJoinPoints.varDeclNoInit(resId, type);
-
-        const boolId = IdGenerator.next("__rtr_flag_");
-        const boolVar = ClavaJoinPoints.varDecl(boolId, ClavaJoinPoints.integerLiteral(0));
-
-        const resVarRef = resVar.varref();
-        const boolVarRef = boolVar.varref();
-
-        call.insertBefore(resVar);
-        call.insertBefore(boolVar);
-
-        // actions in the function itself
-        const params = this.createParams([resVarRef, boolVarRef]);
-        fun.addParam(params[0].name, params[0].type);
-        fun.addParam(params[1].name, params[1].type);
-
-        const resVarParam = fun.params[fun.params.length - 2];
-
-        for (const ret of returnStmts) {
-            const derefResVarParam = ClavaJoinPoints.unaryOp("*", resVarParam.varref());
-            const wrappedDerefResVarParam = ClavaJoinPoints.parenthesis(derefResVarParam);
-
-            const retExpr = ret.children[0] as Expression;
-            retExpr.detach();
-            const refRetVal = retExpr.type.isPointer ?
-                ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", retExpr)) :
-                retExpr;
-
-            const op1 = ClavaJoinPoints.binaryOp("=", wrappedDerefResVarParam, refRetVal, resVarParam.type);
-            ret.insertBefore(ClavaJoinPoints.exprStmt(op1));
-
-            const boolVarParam = fun.params[fun.params.length - 1];
-            const newVarref = ClavaJoinPoints.varRef(boolVarParam);
-            const derefBoolVarParam = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", newVarref));
-
-            const trueVal = ClavaJoinPoints.integerLiteral(1);
-
-            const op2 = ClavaJoinPoints.binaryOp("=", derefBoolVarParam, trueVal, boolVarParam.type);
-            ret.insertBefore(op2);
-        }
-        fun.setType(ClavaJoinPoints.type("void"));
-
-
-        // actions on the function call
-        const resVarAddr = ClavaJoinPoints.unaryOp("&", resVarRef);
-        const boolVarAddr = ClavaJoinPoints.unaryOp("&", boolVarRef);
-        const allArgs = call.argList.concat([resVarAddr, boolVarAddr]);
-        call = this.updateCall(call, fun, allArgs);
-
-        // actions after the function call
-        const caller = call.getAncestor("function") as FunctionJp;
-
-        const resVarIsPointer = resVar.type.isPointer;
-        const resVarBaseType = this.simpleType(resVar.type);
-        const callerRetBaseType = this.simpleType(caller.type);
-        let returnStmt: ReturnStmt;
-        if (caller.type.code != resVar.type.code && resVarIsPointer && resVarBaseType == callerRetBaseType) {
-            console.log(caller.type.code + " != " + resVar.type.code);
-            const derefResVar = ClavaJoinPoints.unaryOp("*", resVarRef);
-            returnStmt = ClavaJoinPoints.returnStmt(derefResVar);
-        }
-        else {
-            returnStmt = ClavaJoinPoints.returnStmt(resVarRef);
-        }
-        const scope = ClavaJoinPoints.scope();
-        scope.setFirstChild(returnStmt);
-        const ifStmt = ClavaJoinPoints.ifStmt(boolVarRef, scope);
-        call.insertAfter(ifStmt);
-
-        return call;
-    }
-
     private ensureVoidReturn(fun: FunctionJp, call: Call): Call | null {
         const returnStmts = this.findNonvoidReturnStmts([fun]);
         if (returnStmts.length == 0) {
@@ -490,6 +403,9 @@ export class Outliner extends AdvancedTransform {
         const [returnValDecl, returnBoolDecl] = this.buildVoidReturnCallCheck(call);
 
         const newCall = this.updateCallForVoidReturn(fun, call, returnValDecl, returnBoolDecl);
+
+        this.updateFunctionForVoidReturn(fun, returnStmts);
+        return newCall;
     }
 
     private buildVoidReturnCallCheck(call: Call): [Vardecl, Vardecl] {
@@ -521,9 +437,10 @@ export class Outliner extends AdvancedTransform {
         const returnBoolPointerType = ClavaJoinPoints.pointer(returnBoolDecl.type);
 
         const returnValParam = ClavaJoinPoints.param(returnValDecl.name, returnValPointerType);
-        fun.addParam(returnValParam.name, returnValParam.type);
         const returnBoolParam = ClavaJoinPoints.param(returnBoolDecl.name, returnBoolPointerType);
+        fun.addParam(returnValParam.name, returnValParam.type);
         fun.addParam(returnBoolParam.name, returnBoolParam.type);
+        fun.setType(ClavaJoinPoints.type("void"));
 
         const newArgList = call.argList.concat([
             ClavaJoinPoints.unaryOp("&", returnValDecl.varref()),
@@ -531,6 +448,32 @@ export class Outliner extends AdvancedTransform {
         ]);
         const newCall = this.updateCall(call, fun, newArgList);
         return newCall;
+    }
+
+    private updateFunctionForVoidReturn(fun: FunctionJp, returnStmts: ReturnStmt[]): void {
+        const returnVarParam = fun.params[fun.params.length - 2];
+        const returnBoolParam = fun.params[fun.params.length - 1];
+
+        for (const returnStmt of returnStmts) {
+            // assign return value to the return variable
+            const returnExpr = returnStmt.children[0] as Expression;
+            returnExpr.detach();
+
+            const returnVarParamRef = ClavaJoinPoints.varRef(returnVarParam);
+            const derefReturnVarParam = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", returnVarParamRef));
+
+            const assignment = ClavaJoinPoints.binaryOp("=", derefReturnVarParam, returnExpr, returnExpr.type);
+            returnStmt.insertBefore(ClavaJoinPoints.exprStmt(assignment));
+
+            // set return bool to 1
+            const returnBoolParamRef = ClavaJoinPoints.varRef(returnBoolParam);
+            const derefReturnBoolParam = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", returnBoolParamRef));
+
+            const trueLiteral = ClavaJoinPoints.integerLiteral(1);
+
+            const boolAssignment = ClavaJoinPoints.binaryOp("=", derefReturnBoolParam, trueLiteral, trueLiteral.type);
+            returnStmt.insertBefore(ClavaJoinPoints.exprStmt(boolAssignment));
+        }
     }
 
     private wrapBeginAndEnd(begin: Statement, end: Statement): [Statement, Statement] {
