@@ -280,12 +280,23 @@ export class Outliner extends AdvancedTransform {
     }
 
     private removeBreaks(fun: FunctionJp, call: Call): void {
-        const breaks: Break[] = [];
+        const breaks: Statement[] = [];
         for (const brk of Query.searchFrom(fun, Break)) {
             if (brk.getAncestor("loop") == null && brk.getAncestor("switch") == null) {
                 breaks.push(brk);
             }
         }
+        // some breaks might have already been replaced by a return statement, and we need to propagate that
+        for (const ret of Query.searchFrom(fun, ReturnStmt)) {
+            if (ret.parent instanceof If) {
+                const ifStmt = ret.parent.parent as If;
+                const cond = ifStmt.cond;
+                if (cond instanceof BinaryOp && cond.left.code.includes("__prematureExit")) {
+                    breaks.push(ret);
+                }
+            }
+        }
+
         if (breaks.length == 0) {
             return;
         }
