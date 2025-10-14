@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, Type, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, IncompleteArrayType, Joinpoint, MemberAccess, Param, Statement, Struct, Type, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { ArrayOfStructsDecl, DirectListDecl, MallocDecl, PointerListDecl, StructDeclFlattener, StructToStructDecl } from "./StructDeclFlattener.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import { ArrayToArrayAssignment, DerefToScalarAssignment, PointerToPointerAssignment, PointerToScalarAssignment, ScalarToScalarAssignment, StructToArrayPositionAssignment } from "./StructRefFlattener.js";
@@ -116,6 +116,11 @@ export class StructFlattener extends AdvancedTransform {
         this.log(`Flattening struct ${name} in function ${fun.name}`);
         let changes = 0;
         changes += this.flattenParams(fun, fields, name);
+        changes += this.flattenRefs(fun, fields, name);
+        // changes += this.flattenDecls(fun, fields, name);
+        // changes += this.flattenAssignments(fun, fields, name);
+        // changes += this.flattenReturns(fun, fields, name);
+        // changes += this.flattenCalls(fun, fields, name);
 
         if (changes > 0) {
             this.log(`Flattened all ${changes} occurrences of struct ${name} in function ${fun.name}`);
@@ -160,11 +165,61 @@ export class StructFlattener extends AdvancedTransform {
         const newParams: Param[] = [];
         fields.forEach((field) => {
             const newParamName = `${param.name}_${field.name}`;
-            const newParamType = isPointer ? ClavaJoinPoints.pointer(field.type) : field.type;
+            const baseType = this.getBaseType(field.type);
+            const newParamType = isPointer ? ClavaJoinPoints.pointer(baseType) : baseType;
             const newParam = ClavaJoinPoints.param(newParamName, newParamType);
             newParams.push(newParam);
         });
         return newParams;
+    }
+
+    private flattenRefs(fun: FunctionJp, fields: Field[], name: string): number {
+        let changes = 0;
+
+        for (const ref of Query.searchFrom(fun, Varref)) {
+            const type = ref.type;
+            if (type.code.includes(name)) {
+                const member = ref.parent;
+
+                if (member instanceof MemberAccess) {
+                    const fieldName = member.name;
+                    const newVarrefName = `${ref.name}_${fieldName}`;
+                    const newVarref = ClavaJoinPoints.exprLiteral(newVarrefName);
+
+                    if (member.arrow) {
+                        //foo->bar, where bar is a scalar
+                        if (!this.fieldIsArray(member, fields)) {
+                            const deref = ClavaJoinPoints.exprLiteral(`(*${newVarrefName})`);
+                            member.replaceWith(deref);
+                        }
+                        //foo->bar, where bar is an array
+                        else {
+                            member.replaceWith(newVarref);
+                        }
+                    }
+                    else {
+                        //foo.bar, where bar is anything
+                        member.replaceWith(newVarref);
+                    }
+                    changes++;
+                }
+            }
+        }
+        return changes;
+    }
+
+    // -----------------------------------------------------------------------
+    private getBaseType(type: Type): Type {
+        const typeStr = type.code.replace("*", "").replace("&", "").replace("const", "").replace("[]", "").trim();
+        return ClavaJoinPoints.type(typeStr);
+    }
+
+    private fieldIsArray(member: MemberAccess, fields: Field[]): boolean {
+        const field = fields.find((f) => f.name === member.name);
+        if (field) {
+            return field.type.code.includes("[]") || field.type instanceof ArrayType || field.type instanceof IncompleteArrayType || field.type instanceof VariableArrayType;
+        }
+        return false;
     }
 
 }
