@@ -467,8 +467,19 @@ export class StructFlattener extends AdvancedTransform {
             }
         }
         fun.setParams(newFunParams);
+        this.updateFunctionDeclarations(fun);
 
         return newParams;
+    }
+
+    private updateFunctionDeclarations(fun: FunctionJp): void {
+        for (const f of Query.search(FunctionJp, { name: fun.name })) {
+            if (!f.isImplementation) {
+                const funDeclStr = `${fun.getDeclaration(true)};`;
+                const newFunDecl = ClavaJoinPoints.stmtLiteral(funDeclStr);
+                f.replaceWith(newFunDecl);
+            }
+        }
     }
 }
 
