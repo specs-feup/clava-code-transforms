@@ -27,14 +27,14 @@ typedef struct {
 
 I2D * readImage(char const *pathName);
 F2D * readFile(unsigned char *fileName);
-I2D * iMallocHandle(int rows, int cols);
-F2D * fMallocHandle(int rows, int cols);
+void iMallocHandle(int rows, int cols, I2D **rtr_val);
+void fMallocHandle(int rows, int cols, F2D **rtr_val);
 UI2D * uiMallocHandle(int rows, int cols);
 void iFreeHandle(I2D *out);
 void fFreeHandle(F2D *out);
 void uiFreeHandle(UI2D *out);
-I2D * iSetArray(int rows, int cols, int val);
-F2D * fSetArray(int rows, int cols, float val);
+void iSetArray(int rows, int cols, int val, I2D **rtr_val);
+void fSetArray(int rows, int cols, float val, F2D **rtr_val);
 I2D * iDeepCopy(I2D *in);
 F2D * fDeepCopy(F2D *in);
 I2D * iDeepCopyRange(I2D *in, int startRow, int numberRows, int startCol, int numberCols);

@@ -10,6 +10,10 @@ export abstract class AdvancedTransform {
         this.silent = silent || false;
     }
 
+    public setSilent(silent: boolean) {
+        this.silent = silent;
+    }
+
     protected simpleType(type: Type, removeSignedInfo: boolean = false): string {
         const baseType = type.code
             .replace("*", "")

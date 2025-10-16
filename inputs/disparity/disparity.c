@@ -8,14 +8,14 @@
 #include "disparity.h"
 #include "timingUtils.h"
 I2D * readImage(char const *pathName);
-I2D * iMallocHandle(int rows, int cols);
+void iMallocHandle(int rows, int cols, I2D **rtr_val);
 unsigned int * photonStartTiming();
 static void magic_timing_begin(unsigned int *cycles);
-I2D * getDisparity(I2D *Ileft, I2D *Iright, int win_sz, int max_shift);
-F2D * fSetArray(int rows, int cols, float val);
-F2D * fMallocHandle(int rows, int cols);
-I2D * iSetArray(int rows, int cols, int val);
-I2D * padarray2(I2D *inMat, I2D *borderMat);
+void getDisparity(I2D *Ileft, I2D *Iright, int win_sz, int max_shift, I2D **rtr_val);
+void fSetArray(int rows, int cols, float val, F2D **rtr_val);
+void fMallocHandle(int rows, int cols, F2D **rtr_val);
+void iSetArray(int rows, int cols, int val, I2D **rtr_val);
+void padarray2(I2D *inMat, I2D *borderMat, I2D **rtr_val);
 void correlateSAD_2D(I2D *Ileft, I2D *Iright, I2D *Iright_moved, int win_sz, int disparity, F2D *SAD, F2D *integralImg, F2D *retSAD);
 void padarray4(I2D *inMat, I2D *borderMat, int dir, I2D *paddedArray);
 void computeSAD(I2D *Ileft, I2D *Iright_moved, F2D *SAD);
@@ -48,6 +48,16 @@ void computeSAD(I2D *Ileft, I2D *Iright_moved, F2D *SAD) {
    return;
 }
 
+void correlateSAD_2D_out0(I2D *range, int *disparity, int *rows, I2D *Iright_moved, int *cols, int *i) {
+   range->data[(0) * range->width + (0)] = 0;
+   range->data[(0) * range->width + (1)] = (*disparity);
+   (*rows) = Iright_moved->height;
+   (*cols) = Iright_moved->width;
+   for((*i) = 0; (*i) < (*rows) * (*cols); (*i)++) {
+      Iright_moved->data[(*i)] = 0;
+   }
+}
+
 void correlateSAD_2D(I2D *Ileft, I2D *Iright, I2D *Iright_moved, int win_sz, int disparity, F2D *SAD, F2D *integralImg, F2D *retSAD) {
    int rows;
    int cols;
@@ -55,14 +65,8 @@ void correlateSAD_2D(I2D *Ileft, I2D *Iright, I2D *Iright_moved, int win_sz, int
    int j;
    int endRM;
    I2D *range;
-   range = iMallocHandle(1, 2);
-   range->data[(0) * range->width + (0)] = 0;
-   range->data[(0) * range->width + (1)] = disparity;
-   rows = Iright_moved->height;
-   cols = Iright_moved->width;
-   for(i = 0; i < rows * cols; i++) {
-      Iright_moved->data[i] = 0;
-   }
+   iMallocHandle(1, 2, &range);
+   correlateSAD_2D_out0(range, &disparity, &rows, Iright_moved, &cols, &i);
    padarray4(Iright, range, -1, Iright_moved);
    computeSAD(Ileft, Iright_moved, SAD);
    integralImage2D2D(SAD, integralImg);
@@ -72,9 +76,13 @@ void correlateSAD_2D(I2D *Ileft, I2D *Iright, I2D *Iright_moved, int win_sz, int
    return;
 }
 
+void fFreeHandle_out0(int *decomp_0, F2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
 void fFreeHandle(F2D *out) {
    int decomp_0;
-   decomp_0 = out != ((void *) 0);
+   fFreeHandle_out0(&decomp_0, out);
    if(decomp_0) {
       free(out);
    }
@@ -82,29 +90,35 @@ void fFreeHandle(F2D *out) {
    return;
 }
 
-F2D * fMallocHandle(int rows, int cols) {
+void fMallocHandle_out0(F2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void fMallocHandle(int rows, int cols, F2D **rtr_val) {
    int i;
    int j;
    F2D *out;
    out = (F2D *) malloc(sizeof(F2D) + sizeof(float) * rows * cols);
-   out->height = rows;
-   out->width = cols;
+   fMallocHandle_out0(out, &rows, &cols);
+   *rtr_val = out;
    
-   return out;
+   return;
 }
 
-F2D * fSetArray(int rows, int cols, float val) {
+void fSetArray(int rows, int cols, float val, F2D **rtr_val) {
    int i;
    int j;
    F2D *out;
-   out = fMallocHandle(rows, cols);
+   fMallocHandle(rows, cols, &out);
    for(i = 0; i < rows; i++) {
       for(j = 0; j < cols; j++) {
          out->data[(i) * out->width + (j)] = val;
       }
    }
+   *rtr_val = out;
    
-   return out;
+   return;
 }
 
 void finalSAD(F2D *integralImg, int win_sz, F2D *retSAD) {
@@ -146,47 +160,67 @@ void findDisparity(F2D *retSAD, F2D *minSAD, I2D *retDisp, int level, int nr, in
    return;
 }
 
-I2D * getDisparity(I2D *Ileft, I2D *Iright, int win_sz, int max_shift) {
-   I2D *retDisp;
-   int nr;
-   int nc;
-   int k;
-   I2D *halfWin;
-   int half_win_sz;
-   int rows;
-   int cols;
-   F2D *retSAD;
-   F2D *minSAD;
-   F2D *SAD;
-   F2D *integralImg;
-   I2D *IrightPadded;
-   I2D *IleftPadded;
+void getDisparity_out0(int *nr, I2D *Ileft, int *nc, int *half_win_sz, int *win_sz) {
+   (*nr) = Ileft->height;
+   (*nc) = Ileft->width;
+   (*half_win_sz) = (*win_sz) / 2;
+}
+
+void getDisparity_out1(int *decomp_0, int *win_sz) {
+   (*decomp_0) = (*win_sz) > 1;
+}
+
+void getDisparity_out2(int *rows, I2D *IleftPadded, int *cols) {
+   (*rows) = IleftPadded->height;
+   (*cols) = IleftPadded->width;
+}
+
+void getDisparity_out3(I2D ** IleftPadded, I2D *Ileft, I2D ** IrightPadded, I2D *Iright) {
+   (*IleftPadded) = Ileft;
+   (*IrightPadded) = Iright;
+}
+
+void getDisparity_loop0(I2D *IleftPadded, I2D *IrightPadded, I2D *Iright_moved, int *win_sz, int *k, F2D *SAD, F2D *integralImg, F2D *retSAD, F2D *minSAD, I2D *retDisp, int *nr, int *nc) {
+   correlateSAD_2D(IleftPadded, IrightPadded, Iright_moved, (*win_sz), (*k), SAD, integralImg, retSAD);
+   findDisparity(retSAD, minSAD, retDisp, (*k), (*nr), (*nc));
+}
+
+void getDisparity(I2D *Ileft, I2D *Iright, int win_sz, int max_shift, I2D **rtr_val) {
    I2D *Iright_moved;
-   nr = Ileft->height;
-   nc = Ileft->width;
-   half_win_sz = win_sz / 2;
-   minSAD = fSetArray(nr, nc, 255.0 * 255.0);
-   retDisp = iSetArray(nr, nc, max_shift);
-   halfWin = iSetArray(1, 2, half_win_sz);
+   I2D *IleftPadded;
+   I2D *IrightPadded;
+   F2D *integralImg;
+   F2D *SAD;
+   F2D *minSAD;
+   F2D *retSAD;
+   int cols;
+   int rows;
+   int half_win_sz;
+   I2D *halfWin;
+   int k;
+   int nc;
+   int nr;
+   I2D *retDisp;
+   getDisparity_out0(&nr, Ileft, &nc, &half_win_sz, &win_sz);
+   fSetArray(nr, nc, 255.0 * 255.0, &minSAD);
+   iSetArray(nr, nc, max_shift, &retDisp);
+   iSetArray(1, 2, half_win_sz, &halfWin);
    int decomp_0;
-   decomp_0 = win_sz > 1;
+   getDisparity_out1(&decomp_0, &win_sz);
    if(decomp_0) {
-      IleftPadded = padarray2(Ileft, halfWin);
-      IrightPadded = padarray2(Iright, halfWin);
+      padarray2(Ileft, halfWin, &IleftPadded);
+      padarray2(Iright, halfWin, &IrightPadded);
    }
    else {
-      IleftPadded = Ileft;
-      IrightPadded = Iright;
+      getDisparity_out3(&(IleftPadded), Ileft, &(IrightPadded), Iright);
    }
-   rows = IleftPadded->height;
-   cols = IleftPadded->width;
-   SAD = fSetArray(rows, cols, 255);
-   integralImg = fSetArray(rows, cols, 0);
-   retSAD = fMallocHandle(rows - win_sz, cols - win_sz);
-   Iright_moved = iSetArray(rows, cols, 0);
+   getDisparity_out2(&rows, IleftPadded, &cols);
+   fSetArray(rows, cols, 255, &SAD);
+   fSetArray(rows, cols, 0, &integralImg);
+   fMallocHandle(rows - win_sz, cols - win_sz, &retSAD);
+   iSetArray(rows, cols, 0, &Iright_moved);
    for(k = 0; k < max_shift; k++) {
-      correlateSAD_2D(IleftPadded, IrightPadded, Iright_moved, win_sz, k, SAD, integralImg, retSAD);
-      findDisparity(retSAD, minSAD, retDisp, k, nr, nc);
+      getDisparity_loop0(IleftPadded, IrightPadded, Iright_moved, &win_sz, &k, SAD, integralImg, retSAD, minSAD, retDisp, &nr, &nc);
    }
    fFreeHandle(retSAD);
    fFreeHandle(minSAD);
@@ -196,13 +230,18 @@ I2D * getDisparity(I2D *Ileft, I2D *Iright, int win_sz, int max_shift) {
    iFreeHandle(IrightPadded);
    iFreeHandle(IleftPadded);
    iFreeHandle(Iright_moved);
+   *rtr_val = retDisp;
    
-   return retDisp;
+   return;
+}
+
+void iFreeHandle_out0(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
 }
 
 void iFreeHandle(I2D *out) {
    int decomp_0;
-   decomp_0 = out != ((void *) 0);
+   iFreeHandle_out0(&decomp_0, out);
    if(decomp_0) {
       free(out);
    }
@@ -210,29 +249,35 @@ void iFreeHandle(I2D *out) {
    return;
 }
 
-I2D * iMallocHandle(int rows, int cols) {
+void iMallocHandle_out0(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle(int rows, int cols, I2D **rtr_val) {
    int i;
    int j;
    I2D *out;
    out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
-   out->height = rows;
-   out->width = cols;
+   iMallocHandle_out0(out, &rows, &cols);
+   *rtr_val = out;
    
-   return out;
+   return;
 }
 
-I2D * iSetArray(int rows, int cols, int val) {
+void iSetArray(int rows, int cols, int val, I2D **rtr_val) {
    int i;
    int j;
    I2D *out;
-   out = iMallocHandle(rows, cols);
+   iMallocHandle(rows, cols, &out);
    for(i = 0; i < rows; i++) {
       for(j = 0; j < cols; j++) {
          out->data[(i) * out->width + (j)] = val;
       }
    }
+   *rtr_val = out;
    
-   return out;
+   return;
 }
 
 void integralImage2D2D(F2D *SAD, F2D *integralImg) {
@@ -259,30 +304,35 @@ void integralImage2D2D(F2D *SAD, F2D *integralImg) {
    return;
 }
 
-I2D * padarray2(I2D *inMat, I2D *borderMat) {
-   int rows;
-   int cols;
-   int bRows;
-   int bCols;
-   int newRows;
-   int newCols;
-   I2D *paddedArray;
-   int i;
+void padarray2_out0(int *rows, I2D *inMat, int *cols, int *bRows, I2D *borderMat, int *bCols, int *newRows, int *newCols) {
+   (*rows) = inMat->height;
+   (*cols) = inMat->width;
+   (*bRows) = borderMat->data[0];
+   (*bCols) = borderMat->data[1];
+   (*newRows) = (*rows) + (*bRows) * 2;
+   (*newCols) = (*cols) + (*bCols) * 2;
+}
+
+void padarray2(I2D *inMat, I2D *borderMat, I2D **rtr_val) {
    int j;
-   rows = inMat->height;
-   cols = inMat->width;
-   bRows = borderMat->data[0];
-   bCols = borderMat->data[1];
-   newRows = rows + bRows * 2;
-   newCols = cols + bCols * 2;
-   paddedArray = iSetArray(newRows, newCols, 0);
+   int i;
+   I2D *paddedArray;
+   int newCols;
+   int newRows;
+   int bCols;
+   int bRows;
+   int cols;
+   int rows;
+   padarray2_out0(&rows, inMat, &cols, &bRows, borderMat, &bCols, &newRows, &newCols);
+   iSetArray(newRows, newCols, 0, &paddedArray);
    for(i = 0; i < rows; i++) {
       for(j = 0; j < cols; j++) {
          paddedArray->data[((bRows + i)) * paddedArray->width + ((bCols + j))] = inMat->data[(i) * inMat->width + (j)];
       }
    }
+   *rtr_val = paddedArray;
    
-   return paddedArray;
+   return;
 }
 
 void padarray4(I2D *inMat, I2D *borderMat, int dir, I2D *paddedArray) {
@@ -415,7 +465,7 @@ I2D * readImage(char const *pathName) {
       fread(&vert_reso, sizeof((((((vert_reso)))))), 1, input);
       fread(&no_of_colors, sizeof((((((no_of_colors)))))), 1, input);
       fread(&no_of_imp_colors, sizeof((((((no_of_imp_colors)))))), 1, input);
-      srcImage = iMallocHandle(height, width);
+      iMallocHandle(height, width, &srcImage);
       if(srcImage->height <= 0 || srcImage->width <= 0 || signature[0] != 'B' || signature[1] != 'M' || (bits_per_pixel != 24 && bits_per_pixel != 8)) {
          printf("ERROR in BMP read: The input file is not in standard BMP format");
          
@@ -477,7 +527,7 @@ int main(int argc, char *argv[]) {
    rows = imleft->height;
    cols = imleft->width;
    start = photonStartTiming();
-   retDisparity = getDisparity(imleft, imright, WIN_SZ, SHIFT);
+   getDisparity(imleft, imright, WIN_SZ, SHIFT, &retDisparity);
    endC = photonEndTiming();
    printf("Input size\t\t- (%dx%d)\n", rows, cols);
    int _scope0_tol, _scope0_ret = 0;

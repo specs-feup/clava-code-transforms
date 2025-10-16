@@ -30,7 +30,7 @@ const structs = [
 
 const structDecomp = new StructFlattener();
 for (const struct of structs) {
-    structDecomp.decomposeByName(struct);
+    structDecomp.flattenByName(struct);
 }
 
 Clava.rebuild();
