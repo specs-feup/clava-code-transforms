@@ -4,7 +4,7 @@ import { FoldingPropagationCombiner } from "../src/constfolding/FoldingPropagati
 import { AstDumper } from "./AstDumper.js";
 import { FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
-import { StructFlattener } from "../src/flattening/LightStructFlattener.js";
+import { StructFlattener } from "../src/flattening/StructFlattener.js";
 
 const dumper = new AstDumper();
 console.log(dumper.dump());

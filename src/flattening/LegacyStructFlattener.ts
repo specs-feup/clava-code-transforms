@@ -1,59 +1,17 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayAccess, ArrayType, BinaryOp, Call, Class, DeclStmt, Expression, Field, FileJp, FunctionJp, Joinpoint, MemberAccess, Param, Statement, Struct, Type, TypedefDecl, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, ArrayType, BinaryOp, Call, DeclStmt, Expression, Field, FunctionJp, MemberAccess, Param, Statement, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { ArrayOfStructsDecl, DirectListDecl, MallocDecl, PointerListDecl, StructDeclFlattener, StructToStructDecl } from "./StructDeclFlattener.js";
-import { AdvancedTransform } from "../AdvancedTransform.js";
 import { ArrayToArrayAssignment, DerefToScalarAssignment, PointerToPointerAssignment, PointerToScalarAssignment, ScalarToScalarAssignment, StructToArrayPositionAssignment } from "./StructRefFlattener.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
+import { StructFlatteningAlgorithm } from "./StructFlattener.js";
 
-export class StructFlattener extends AdvancedTransform {
+export class LegacyStructFlattener extends StructFlatteningAlgorithm {
     constructor(silent: boolean = false) {
-        super("StructFlattener", silent);
+        super("LegacyStructFlattener", silent);
     }
 
-    public decomposeAll(): string[] {
-        const structs = this.findAllStructs();
-        this.log(`Found ${structs.length} regular structs`);
-
-        const classes = this.findAllStructlikeClasses();
-        this.log(`Found ${classes.length} structs aliased as classes`);
-
-        const totalStructs = [
-            ...structs,
-            ...classes
-        ];
-        const decompNames: string[] = [];
-
-        totalStructs.forEach(([name, struct]) => {
-            this.decompose(struct.fields, name);
-            decompNames.push(name);
-        });
-
-        return decompNames;
-    }
-
-    public decomposeByName(name: string): void {
-        const structs = [
-            ...this.findAllStructs(),
-            ...this.findAllStructlikeClasses()
-        ];
-        structs.forEach((elem) => {
-            const elemName = elem[0];
-            const elemStruct = elem[1];
-
-            if (elemName === name) {
-                this.decompose(elemStruct.fields, name);
-            }
-        });
-    }
-
-    public decomposeStruct(struct: Struct): void {
-        const name = this.getStructName(struct);
-        this.decompose(struct.fields, name);
-    }
-
-    // -----------------------------------------------------------------------
-    private decompose(fields: Field[], name: string): void {
+    public decompose(fields: Field[], name: string): void {
         this.log(`Decomposing struct "${name}" with ${fields.length} field(s)`);
 
         const decls = this.getAllDeclsOfStruct(name);
@@ -72,54 +30,7 @@ export class StructFlattener extends AdvancedTransform {
         }
     }
 
-    private findAllStructs(): [string, Struct][] {
-        const structs: [string, Struct][] = [];
-
-        for (const struct of Query.search(Struct)) {
-            const name = this.getStructName(struct);
-            structs.push([name, struct]);
-        }
-        return structs;
-    }
-
-    private findAllStructlikeClasses(): [string, Class][] {
-        const classes: Map<string, Class> = new Map();
-
-        for (const file of Query.search(FileJp)) {
-            for (const stmt of file.children) {
-                if (stmt instanceof Class) {
-                    const classJp = stmt as Class;
-                    let name = classJp.name;
-
-                    let isStruct = false;
-                    for (const typedef of Query.searchFrom(classJp, TypedefDecl)) {
-                        if (typedef.type.code.trim() == "struct") {
-                            isStruct = true;
-                            name = typedef.name;
-                        }
-                    }
-
-                    if (isStruct) {
-                        classes.set(name, classJp);
-                    }
-                }
-            }
-        }
-        return Array.from(classes);
-    }
-
-    public getStructName(struct: Struct): string {
-        let name: string = struct.name;
-
-        // typedef struct { ... } typedef_name;
-        if (struct.name === "") {
-            const jp: Joinpoint = struct.children[struct.children.length - 1].children[0];
-            const typedef = jp as TypedefDecl;
-            name = typedef.name;
-        }
-        return name;
-    }
-
+    // -----------------------------------------------------------------------
     private getAllDeclsOfStruct(name: string): Vardecl[] {
         const decls = [];
 
