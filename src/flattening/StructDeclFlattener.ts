@@ -1,7 +1,7 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import { ArrayType, BinaryOp, Call, Cast, Expression, ExprStmt, Field, ImplicitValue, InitList, IntLiteral, Literal, Struct, UnaryExprOrType, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import { StructDecomposerUtil } from "./StructFlattener.js";
+import { StructDecomposerUtil } from "./LightStructFlattener.js";
 
 export interface StructDeclFlattener {
     validate(decl: Vardecl): boolean;

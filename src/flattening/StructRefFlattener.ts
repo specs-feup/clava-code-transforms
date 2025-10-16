@@ -1,6 +1,6 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import { ArrayAccess, Expression, Statement, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
-import { StructDecomposerUtil } from "./StructFlattener.js";
+import { StructDecomposerUtil } from "./LightStructFlattener.js";
 
 export abstract class StructRefFlattener {
     public abstract validate(leftRef: Varref, rightRef: Varref): boolean;
