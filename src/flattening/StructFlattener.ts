@@ -1,4 +1,4 @@
-import { Class, FileJp, Joinpoint, Struct, TypedefDecl } from "@specs-feup/clava/api/Joinpoints.js";
+import { Class, FileJp, FunctionJp, Joinpoint, Struct, TypedefDecl } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import { LegacyStructFlattener } from "./legacy/LegacyStructFlattener.js";
@@ -13,7 +13,7 @@ export class StructFlattener extends AdvancedTransform {
         this.algorithm.setSilent(silent);
     }
 
-    public flattenAll(): string[] {
+    public flattenAll(startingPoint?: FunctionJp): string[] {
         const structs = this.findAllStructs();
         this.log(`Found ${structs.length} regular structs`);
 
@@ -28,7 +28,7 @@ export class StructFlattener extends AdvancedTransform {
 
         totalStructs.forEach(([name, struct]) => {
             this.log(`Flattening struct ${name}`);
-            this.algorithm.decompose(struct.fields, name);
+            this.algorithm.decompose(struct.fields, name, startingPoint);
             decompNames.push(name);
             this.log(`Done flattening struct ${name}`);
         });
@@ -37,7 +37,7 @@ export class StructFlattener extends AdvancedTransform {
         return decompNames;
     }
 
-    public flattenByName(name: string): void {
+    public flattenByName(name: string, startingPoint?: FunctionJp): void {
         const structs = [
             ...this.findAllStructs(),
             ...this.findAllStructlikeClasses()
@@ -47,14 +47,14 @@ export class StructFlattener extends AdvancedTransform {
             const elemStruct = elem[1];
 
             if (elemName === name) {
-                this.algorithm.decompose(elemStruct.fields, name);
+                this.algorithm.decompose(elemStruct.fields, name, startingPoint);
             }
         });
     }
 
-    public flattenStruct(struct: Struct): void {
+    public flattenStruct(struct: Struct, startingPoint?: FunctionJp): void {
         const name = this.getStructName(struct);
-        this.algorithm.decompose(struct.fields, name);
+        this.algorithm.decompose(struct.fields, name, startingPoint);
     }
 
     // -----------------------------------------------------------------------

@@ -9,10 +9,13 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         super("StructFlattener", silent);
     }
 
-    public decompose(fields: Field[], name: string): void {
-        for (const fun of Query.search(FunctionJp)) {
+    public decompose(fields: Field[], name: string, startingPoint?: FunctionJp): void {
+        const funs = this.extractFunctionCalls(startingPoint);
+        this.log(`Found ${funs.length} functions to flatten struct ${name} in`);
+
+        funs.forEach((fun) => {
             this.flattenInFunction(fun, fields, name);
-        }
+        });
     }
 
     // -----------------------------------------------------------------------
@@ -114,6 +117,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
     private flattenDecls(fun: FunctionJp, fields: Field[], name: string): number {
         let changes = 0;
+        const toRemove: DeclStmt[] = [];
 
         Query.searchFrom(fun, Vardecl).get().forEach((decl) => {
             const type = decl.type;
@@ -125,11 +129,14 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                 newDecls.forEach((newDecl) => {
                     parent.insertBefore(newDecl);
                 });
-                parent.detach();
+                toRemove.push(decl.parent as DeclStmt);
 
                 this.log(`  Flattened decl ${decl.name}`);
                 changes++;
             }
+        });
+        toRemove.forEach((declStmt) => {
+            declStmt.detach();
         });
         return changes;
     }
@@ -258,7 +265,6 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             }
         }
     }
-
     // -----------------------------------------------------------------------
     private getBaseType(type: Type): Type {
         const typeStr = type.code.replace("*", "").replace("&", "").replace("const", "").replace("[]", "").trim();
