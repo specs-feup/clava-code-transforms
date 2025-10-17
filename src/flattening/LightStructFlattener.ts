@@ -2,7 +2,7 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { ArrayType, Expression, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, Statement, Type, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
-import { StructFlatteningAlgorithm } from "./StructFlattener.js";
+import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 
 export class LightStructFlattener extends StructFlatteningAlgorithm {
     constructor(silent: boolean = false) {

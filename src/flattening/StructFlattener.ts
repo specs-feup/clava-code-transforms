@@ -2,6 +2,7 @@ import { Class, FileJp, Joinpoint, Struct, TypedefDecl } from "@specs-feup/clava
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import { LegacyStructFlattener } from "./LegacyStructFlattener.js";
+import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 
 export class StructFlattener extends AdvancedTransform {
     private algorithm: StructFlatteningAlgorithm;
@@ -9,7 +10,7 @@ export class StructFlattener extends AdvancedTransform {
     constructor(algorithm: StructFlatteningAlgorithm = new LegacyStructFlattener(), silent: boolean = false) {
         super("StructFlattener", silent);
         this.algorithm = algorithm;
-        algorithm.setSilent(silent);
+        this.algorithm.setSilent(silent);
     }
 
     public flattenAll(): string[] {
@@ -106,10 +107,3 @@ export class StructFlattener extends AdvancedTransform {
     }
 }
 
-export abstract class StructFlatteningAlgorithm extends AdvancedTransform {
-    constructor(name: string, silent: boolean = false) {
-        super(name, silent);
-    }
-
-    public abstract decompose(fields: Joinpoint[], structName: string): void;
-}
