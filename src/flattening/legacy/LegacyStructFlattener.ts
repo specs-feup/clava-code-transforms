@@ -4,7 +4,7 @@ import { ArrayAccess, ArrayType, BinaryOp, Call, DeclStmt, Expression, Field, Fu
 import { ArrayOfStructsDecl, DirectListDecl, MallocDecl, PointerListDecl, StructDeclFlattener, StructToStructDecl } from "./StructDeclFlattener.js";
 import { ArrayToArrayAssignment, DerefToScalarAssignment, PointerToPointerAssignment, PointerToScalarAssignment, ScalarToScalarAssignment, StructToArrayPositionAssignment } from "./StructRefFlattener.js";
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
-import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
+import { StructFlatteningAlgorithm } from "../StructFlatteningAlgorithm.js";
 
 export class LegacyStructFlattener extends StructFlatteningAlgorithm {
     constructor(silent: boolean = false) {

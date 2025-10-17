@@ -1,7 +1,7 @@
 import { Class, FileJp, Joinpoint, Struct, TypedefDecl } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
-import { LegacyStructFlattener } from "./LegacyStructFlattener.js";
+import { LegacyStructFlattener } from "./legacy/LegacyStructFlattener.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 
 export class StructFlattener extends AdvancedTransform {
