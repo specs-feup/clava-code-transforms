@@ -22,10 +22,9 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         let changes = 0;
         changes += this.flattenParams(fun, fields, name);
         changes += this.flattenMemberRefs(fun, fields, name);
-        // changes += this.flattenDecls(fun, fields, name);
-        // changes += this.flattenAssignments(fun, fields, name);
-        // changes += this.flattenReturns(fun, fields, name);
-        // changes += this.flattenCalls(fun, fields, name);
+        changes += this.flattenDecls(fun, fields, name);
+        changes += this.flattenAssignments(fun, fields, name);
+        changes += this.flattenCalls(fun, fields, name);
 
         if (changes > 0) {
             this.log(`Flattened all ${changes} occurrences of struct ${name} in function ${fun.name}`);
@@ -113,6 +112,18 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         return changes;
     }
 
+    private flattenDecls(fun: FunctionJp, fields: Field[], name: string): number {
+        return 0;
+    }
+
+    flattenAssignments(fun: FunctionJp, fields: Field[], name: string) {
+        return 0;
+    }
+
+    flattenCalls(fun: FunctionJp, fields: Field[], name: string) {
+        return 0;
+    }
+
     // -----------------------------------------------------------------------
     private getBaseType(type: Type): Type {
         const typeStr = type.code.replace("*", "").replace("&", "").replace("const", "").replace("[]", "").trim();
@@ -125,21 +136,5 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             return field.type.code.includes("[]") || field.type instanceof ArrayType || field.type instanceof IncompleteArrayType || field.type instanceof VariableArrayType;
         }
         return false;
-    }
-
-}
-
-export class StructDecomposerUtil {
-    public static generateMemcpy(dest: Expression, source: Expression, size: Expression): Statement {
-        const retType = ClavaJoinPoints.type("void*");
-        const call = ClavaJoinPoints.callFromName("memcpy", retType, dest, source, size);
-
-        if (Clava.isCxx()) {
-            call.setName("std::memcpy");
-            for (const file of Clava.getProgram().files) {
-                file.addInclude("cstring", true);
-            }
-        }
-        return ClavaJoinPoints.exprStmt(call);
     }
 }
