@@ -200,12 +200,22 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
     private flattenCallArg(arg: Expression, fields: Field[]): Expression[] {
         const newArgs: Expression[] = [];
+        let [prefix, argName, suffix] = ["", arg.code, ""];
+
+        // this only works because we know we only have expr that are at most (*argName) or (&argName)
+        if (arg.code.includes("(")) {
+            const openIdx = arg.code.indexOf("(");
+            const closeIdx = arg.code.lastIndexOf(")");
+            prefix = arg.code.substring(0, openIdx + 1);
+            argName = arg.code.substring(openIdx + 1, closeIdx);
+            suffix = arg.code.substring(closeIdx);
+        }
+
         fields.forEach((field) => {
-            const newArgName = `${arg.code}_${field.name}`;
+            const newArgName = `${argName}_${field.name}`;
             const newArg = ClavaJoinPoints.exprLiteral(newArgName);
             newArgs.push(newArg);
         });
-        console.log(newArgs.map(a => a.code).join(", "));
         return newArgs;
     }
 
