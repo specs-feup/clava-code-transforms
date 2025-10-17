@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayType, Call, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, Statement, Type, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayType, Call, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, Statement, Type, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 
@@ -113,7 +113,39 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     }
 
     private flattenDecls(fun: FunctionJp, fields: Field[], name: string): number {
-        return 0;
+        let changes = 0;
+
+        Query.searchFrom(fun, Vardecl).get().forEach((decl) => {
+            const type = decl.type;
+
+            if (type.code.includes(name)) {
+                const newDecls = this.flattenDecl(decl, fields);
+
+                const parent = decl.parent;
+                newDecls.forEach((newDecl) => {
+                    parent.insertBefore(newDecl);
+                });
+                parent.detach();
+
+                this.log(`  Flattened decl ${decl.name}`);
+                changes++;
+            }
+        });
+        return changes;
+    }
+
+    private flattenDecl(decl: Vardecl, fields: Field[]): DeclStmt[] {
+        const declStmts: DeclStmt[] = [];
+
+        fields.forEach((field) => {
+            const newDeclName = `${decl.name}_${field.name}`;
+            const baseType = this.getBaseType(field.type);
+            const newDeclType = decl.type.isPointer ? ClavaJoinPoints.pointer(baseType) : baseType;
+            const newDecl = ClavaJoinPoints.varDeclNoInit(newDeclName, newDeclType);
+            const declStmt = ClavaJoinPoints.declStmt(newDecl);
+            declStmts.push(declStmt);
+        });
+        return declStmts;
     }
 
     private flattenAssignments(fun: FunctionJp, fields: Field[], name: string) {
