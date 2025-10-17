@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayType, Call, Expression, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, Statement, Type, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayType, Call, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, Statement, Type, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 
@@ -123,9 +123,9 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     private flattenCalls(fun: FunctionJp, fields: Field[], name: string) {
         let changes = 0;
 
-        for (const call of Query.searchFrom(fun, Call)) {
+        Query.searchFrom(fun, Call).get().forEach((call) => {
             changes += this.flattenCall(call, fields, name);
-        }
+        });
         return changes;
     }
 
@@ -145,6 +145,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             return changes;
         }
 
+        const flattenedNames: string[] = [];
         const newArgList: Expression[] = [];
         for (let i = 0; i < call.args.length; i++) {
             const arg = call.args[i];
@@ -153,18 +154,15 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                 continue;
             }
             else {
+                flattenedNames.push(arg.code);
                 const newArgs = this.flattenCallArg(arg, fields);
                 newArgList.push(...newArgs);
                 changes += 1;
             }
         };
-        const currNArgs = call.args.length;
-        for (let i = 0; i < currNArgs; i++) {
-            call.setArg(i, newArgList[i]);
-        }
-        for (let i = currNArgs; i < newArgList.length; i++) {
-            call.addArg(newArgList[i].code, newArgList[i].type);
-        }
+        this.updateCallWithNewArgs(call, newArgList, fields);
+
+        this.log(`  Flattened args {${flattenedNames.join(", ")}} in call to ${call.name}`);
         return changes;
     }
 
@@ -175,7 +173,48 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             const newArg = ClavaJoinPoints.exprLiteral(newArgName);
             newArgs.push(newArg);
         });
+        console.log(newArgs.map(a => a.code).join(", "));
         return newArgs;
+    }
+
+    private updateCallWithNewArgs(call: Call, newArgs: Expression[], fields: Field[]): void {
+        if (call.name == "free") {
+            if (newArgs.length > 1) {
+                const parentExpr = call.parent;
+                if (!(parentExpr instanceof ExprStmt)) {
+                    throw new Error(`Expected parent of free call to be an ExprStmt, but got ${parentExpr?.joinPointType}`);
+                }
+
+                const newCalls: ExprStmt[] = [];
+                fields.forEach((field, index) => {
+                    if (field.type.isPointer || field.type.isArray) {
+                        const funName = "free";
+                        const funRetType = ClavaJoinPoints.type("void");
+                        const arg = newArgs[index];
+
+                        const newCall = ClavaJoinPoints.callFromName(funName, funRetType, arg);
+                        const newExpr = ClavaJoinPoints.exprStmt(newCall);
+                        newCalls.push(newExpr);
+                    }
+                });
+                newCalls.forEach((newCall) => {
+                    parentExpr.insertBefore(newCall);
+                });
+                parentExpr.detach();
+            }
+            else {
+                call.setArg(0, newArgs[0]);
+            }
+        }
+        else {
+            const currNArgs = call.args.length;
+            for (let i = 0; i < currNArgs; i++) {
+                call.setArg(i, newArgs[i]);
+            }
+            for (let i = currNArgs; i < newArgs.length; i++) {
+                call.addArg(newArgs[i].code, newArgs[i].type);
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
