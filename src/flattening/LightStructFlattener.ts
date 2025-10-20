@@ -4,6 +4,7 @@ import { ArrayType, BinaryOp, Call, DeclStmt, Expression, ExprStmt, Field, Funct
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 import { Voidifier } from "../function/Voidifier.js";
+import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 
 export class LightStructFlattener extends StructFlatteningAlgorithm {
     constructor(silent: boolean = false) {
@@ -180,8 +181,83 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         return declStmts;
     }
 
-    private flattenAssignments(fun: FunctionJp, fields: Field[], name: string) {
-        return 0;
+    private flattenAssignments(fun: FunctionJp, fields: Field[], name: string): number {
+        let changes = 0;
+
+        for (const ref of Query.searchFrom(fun, Varref)) {
+            const type = ref.type;
+            if (!type.code.includes(name)) {
+                continue;
+            }
+
+            // foo = 
+            if (ref.parent instanceof BinaryOp && ref.parent.operator == "=") {
+                const assign = ref.parent as BinaryOp;
+                const isLeft = assign.left.astId === ref.astId;
+                if (!isLeft) {
+                    continue;
+                }
+                const rhs = assign.right;
+
+                const isMallocAssignment = Query.searchFrom(rhs, Call, { name: "malloc" }).get().length > 0;
+                if (isMallocAssignment) {
+                    this.flattenMallocAssignment(assign, fields, name);
+                    changes++;
+                    this.log(`  Flattened malloc assignment to ${ref.name}`);
+                    continue;
+                }
+            }
+        }
+        return changes;
+    }
+
+    private flattenMallocAssignment(assign: BinaryOp, fields: Field[], name: string): void {
+        const parentStmt = assign.getAncestor("statement") as Statement;
+        const lhs = assign.left;
+        const rhs = assign.right;
+        const malloc = Query.searchFromInclusive(rhs, Call, { name: "malloc" }).first()!;
+
+        const sizeExpr = malloc.args[0];
+        const sizeVarName = IdGenerator.next("malloc_size");
+        const sizeVar = ClavaJoinPoints.varDecl(sizeVarName, sizeExpr);
+        sizeVar.setType(ClavaJoinPoints.type("size_t"));
+        const sizeDeclStmt = ClavaJoinPoints.declStmt(sizeVar);
+        parentStmt.insertBefore(sizeDeclStmt);
+
+        for (const field of fields) {
+            const newLhsName = `${lhs.code}_${field.name}`;
+            const baseType = this.getBaseType(field.type);
+            // should always be pointer anyway, as the original assigns to a struct pointer
+            const newLhsType = lhs.type.isPointer ? ClavaJoinPoints.pointer(baseType) : baseType;
+            const newLhs = ClavaJoinPoints.exprLiteral(newLhsName);
+            newLhs.setType(newLhsType);
+
+            let fieldSizeExpr: Expression;
+            if (field.type.isArray) {
+                const sizes = [sizeVarName];
+                for (const otherField of fields) {
+                    if (otherField.name === field.name) {
+                        break;
+                    }
+                    sizes.push(`sizeof(${this.getBaseType(otherField.type).code})`);
+                }
+                if (sizes.length > 1) {
+                    fieldSizeExpr = ClavaJoinPoints.exprLiteral(sizes.join(" - "));
+                }
+                else {
+                    fieldSizeExpr = ClavaJoinPoints.exprLiteral(sizes[0]);
+                }
+            }
+            else {
+                fieldSizeExpr = ClavaJoinPoints.exprLiteral(`sizeof(${baseType.code})`);
+            }
+
+            const newMalloc = ClavaJoinPoints.callFromName("malloc", ClavaJoinPoints.pointer(baseType), fieldSizeExpr);
+            const newAssign = ClavaJoinPoints.binaryOp("=", newLhs, newMalloc);
+
+            parentStmt.insertBefore(ClavaJoinPoints.exprStmt(newAssign));
+        }
+        parentStmt.detach();
     }
 
     private flattenCalls(fun: FunctionJp, fields: Field[], name: string) {
