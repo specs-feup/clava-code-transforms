@@ -11,8 +11,10 @@ export class LegacyStructFlattener extends StructFlatteningAlgorithm {
         super("LegacyStructFlattener", silent);
     }
 
-    public decompose(fields: Field[], name: string, startingPoint?: FunctionJp): void {
+    public decompose(fields: Field[], name: string, functions: FunctionJp[]): void {
         this.log(`Decomposing struct "${name}" with ${fields.length} field(s)`);
+        this.logWarning("LegacyStructFlattener is deprecated. Consider using a more recent implementation.");
+        this.logWarning("LegacyStructFlattener is always applied over all functions in the codebase (ignoring the provided function list).");
 
         const decls = this.getAllDeclsOfStruct(name);
         this.log(`Found ${decls.length} declarations for struct "${name}"`);

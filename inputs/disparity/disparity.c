@@ -7,6 +7,82 @@
 #include "sdvbs_common.h"
 #include "disparity.h"
 #include "timingUtils.h"
+void padarray2_rep0(I2D *inMat, I2D *borderMat, I2D **rtr_val);
+void padarray2_rep1(I2D *inMat, I2D *borderMat, I2D **rtr_val);
+void padarray2_out0_rep0(int *rows, I2D *inMat, int *cols, int *bRows, I2D *borderMat, int *bCols, int *newRows, int *newCols);
+void padarray2_out0_rep1(int *rows, I2D *inMat, int *cols, int *bRows, I2D *borderMat, int *bCols, int *newRows, int *newCols);
+void padarray2_out0_rep2(int *rows, I2D *inMat, int *cols, int *bRows, I2D *borderMat, int *bCols, int *newRows, int *newCols);
+void iSetArray_rep0(int rows, int cols, int val, I2D **rtr_val);
+void iSetArray_rep1(int rows, int cols, int val, I2D **rtr_val);
+void iSetArray_rep2(int rows, int cols, int val, I2D **rtr_val);
+void iSetArray_rep4(int rows, int cols, int val, I2D **rtr_val);
+void iSetArray_rep5(int rows, int cols, int val, I2D **rtr_val);
+void iSetArray_rep6(int rows, int cols, int val, I2D **rtr_val);
+void iSetArray_rep3(int rows, int cols, int val, I2D **rtr_val);
+void iMallocHandle_rep0(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep1(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep7(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep8(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep9(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep10(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep2(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep3(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep4(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep5(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_rep6(int rows, int cols, I2D **rtr_val);
+void iMallocHandle_out0_rep0(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep1(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep2(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep3(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep4(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep8(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep9(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep10(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep11(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep12(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep5(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep6(I2D *out, int *rows, int *cols);
+void iMallocHandle_out0_rep7(I2D *out, int *rows, int *cols);
+void iFreeHandle_rep0(I2D *out);
+void iFreeHandle_rep1(I2D *out);
+void iFreeHandle_rep2(I2D *out);
+void iFreeHandle_rep3(I2D *out);
+void iFreeHandle_rep4(I2D *out);
+void iFreeHandle_rep5(I2D *out);
+void iFreeHandle_rep6(I2D *out);
+void iFreeHandle_rep7(I2D *out);
+void iFreeHandle_out0_rep0(int *decomp_0, I2D *out);
+void iFreeHandle_out0_rep1(int *decomp_0, I2D *out);
+void iFreeHandle_out0_rep2(int *decomp_0, I2D *out);
+void iFreeHandle_out0_rep3(int *decomp_0, I2D *out);
+void iFreeHandle_out0_rep4(int *decomp_0, I2D *out);
+void iFreeHandle_out0_rep5(int *decomp_0, I2D *out);
+void iFreeHandle_out0_rep6(int *decomp_0, I2D *out);
+void iFreeHandle_out0_rep7(int *decomp_0, I2D *out);
+void iFreeHandle_out0_rep8(int *decomp_0, I2D *out);
+void fSetArray_rep0(int rows, int cols, float val, F2D **rtr_val);
+void fSetArray_rep1(int rows, int cols, float val, F2D **rtr_val);
+void fSetArray_rep2(int rows, int cols, float val, F2D **rtr_val);
+void fMallocHandle_rep0(int rows, int cols, F2D **rtr_val);
+void fMallocHandle_rep1(int rows, int cols, F2D **rtr_val);
+void fMallocHandle_rep2(int rows, int cols, F2D **rtr_val);
+void fMallocHandle_rep3(int rows, int cols, F2D **rtr_val);
+void fMallocHandle_rep4(int rows, int cols, F2D **rtr_val);
+void fMallocHandle_out0_rep0(F2D *out, int *rows, int *cols);
+void fMallocHandle_out0_rep1(F2D *out, int *rows, int *cols);
+void fMallocHandle_out0_rep2(F2D *out, int *rows, int *cols);
+void fMallocHandle_out0_rep3(F2D *out, int *rows, int *cols);
+void fMallocHandle_out0_rep4(F2D *out, int *rows, int *cols);
+void fMallocHandle_out0_rep5(F2D *out, int *rows, int *cols);
+void fFreeHandle_rep0(F2D *out);
+void fFreeHandle_rep1(F2D *out);
+void fFreeHandle_rep2(F2D *out);
+void fFreeHandle_rep3(F2D *out);
+void fFreeHandle_out0_rep0(int *decomp_0, F2D *out);
+void fFreeHandle_out0_rep1(int *decomp_0, F2D *out);
+void fFreeHandle_out0_rep2(int *decomp_0, F2D *out);
+void fFreeHandle_out0_rep3(int *decomp_0, F2D *out);
+void fFreeHandle_out0_rep4(int *decomp_0, F2D *out);
 I2D * readImage(char const *pathName);
 void iMallocHandle(int rows, int cols, I2D **rtr_val);
 unsigned int * photonStartTiming();
@@ -65,13 +141,13 @@ void correlateSAD_2D(I2D *Ileft, I2D *Iright, I2D *Iright_moved, int win_sz, int
    int j;
    int endRM;
    I2D *range;
-   iMallocHandle(1, 2, &range);
+   iMallocHandle_rep0(1, 2, &range);
    correlateSAD_2D_out0(range, &disparity, &rows, Iright_moved, &cols, &i);
    padarray4(Iright, range, -1, Iright_moved);
    computeSAD(Ileft, Iright_moved, SAD);
    integralImage2D2D(SAD, integralImg);
    finalSAD(integralImg, win_sz, retSAD);
-   iFreeHandle(range);
+   iFreeHandle_rep0(range);
    
    return;
 }
@@ -80,9 +156,69 @@ void fFreeHandle_out0(int *decomp_0, F2D *out) {
    (*decomp_0) = out != ((void *) 0);
 }
 
+void fFreeHandle_out0_rep4(int *decomp_0, F2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void fFreeHandle_out0_rep3(int *decomp_0, F2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void fFreeHandle_out0_rep2(int *decomp_0, F2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void fFreeHandle_out0_rep1(int *decomp_0, F2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void fFreeHandle_out0_rep0(int *decomp_0, F2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
 void fFreeHandle(F2D *out) {
    int decomp_0;
-   fFreeHandle_out0(&decomp_0, out);
+   fFreeHandle_out0_rep0(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void fFreeHandle_rep3(F2D *out) {
+   int decomp_0;
+   fFreeHandle_out0_rep1(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void fFreeHandle_rep2(F2D *out) {
+   int decomp_0;
+   fFreeHandle_out0_rep2(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void fFreeHandle_rep1(F2D *out) {
+   int decomp_0;
+   fFreeHandle_out0_rep3(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void fFreeHandle_rep0(F2D *out) {
+   int decomp_0;
+   fFreeHandle_out0_rep4(&decomp_0, out);
    if(decomp_0) {
       free(out);
    }
@@ -95,12 +231,97 @@ void fMallocHandle_out0(F2D *out, int *rows, int *cols) {
    out->width = (*cols);
 }
 
+void fMallocHandle_out0_rep5(F2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void fMallocHandle_out0_rep4(F2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void fMallocHandle_out0_rep3(F2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void fMallocHandle_out0_rep2(F2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void fMallocHandle_out0_rep1(F2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void fMallocHandle_out0_rep0(F2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
 void fMallocHandle(int rows, int cols, F2D **rtr_val) {
    int i;
    int j;
    F2D *out;
    out = (F2D *) malloc(sizeof(F2D) + sizeof(float) * rows * cols);
-   fMallocHandle_out0(out, &rows, &cols);
+   fMallocHandle_out0_rep0(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void fMallocHandle_rep4(int rows, int cols, F2D **rtr_val) {
+   int i;
+   int j;
+   F2D *out;
+   out = (F2D *) malloc(sizeof(F2D) + sizeof(float) * rows * cols);
+   fMallocHandle_out0_rep1(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void fMallocHandle_rep3(int rows, int cols, F2D **rtr_val) {
+   int i;
+   int j;
+   F2D *out;
+   out = (F2D *) malloc(sizeof(F2D) + sizeof(float) * rows * cols);
+   fMallocHandle_out0_rep2(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void fMallocHandle_rep2(int rows, int cols, F2D **rtr_val) {
+   int i;
+   int j;
+   F2D *out;
+   out = (F2D *) malloc(sizeof(F2D) + sizeof(float) * rows * cols);
+   fMallocHandle_out0_rep3(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void fMallocHandle_rep1(int rows, int cols, F2D **rtr_val) {
+   int i;
+   int j;
+   F2D *out;
+   out = (F2D *) malloc(sizeof(F2D) + sizeof(float) * rows * cols);
+   fMallocHandle_out0_rep4(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void fMallocHandle_rep0(int rows, int cols, F2D **rtr_val) {
+   int i;
+   int j;
+   F2D *out;
+   out = (F2D *) malloc(sizeof(F2D) + sizeof(float) * rows * cols);
+   fMallocHandle_out0_rep5(out, &rows, &cols);
    *rtr_val = out;
    
    return;
@@ -110,7 +331,52 @@ void fSetArray(int rows, int cols, float val, F2D **rtr_val) {
    int i;
    int j;
    F2D *out;
-   fMallocHandle(rows, cols, &out);
+   fMallocHandle_rep0(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void fSetArray_rep2(int rows, int cols, float val, F2D **rtr_val) {
+   int i;
+   int j;
+   F2D *out;
+   fMallocHandle_rep1(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void fSetArray_rep1(int rows, int cols, float val, F2D **rtr_val) {
+   int i;
+   int j;
+   F2D *out;
+   fMallocHandle_rep2(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void fSetArray_rep0(int rows, int cols, float val, F2D **rtr_val) {
+   int i;
+   int j;
+   F2D *out;
+   fMallocHandle_rep3(rows, cols, &out);
    for(i = 0; i < rows; i++) {
       for(j = 0; j < cols; j++) {
          out->data[(i) * out->width + (j)] = val;
@@ -202,34 +468,34 @@ void getDisparity(I2D *Ileft, I2D *Iright, int win_sz, int max_shift, I2D **rtr_
    int nr;
    I2D *retDisp;
    getDisparity_out0(&nr, Ileft, &nc, &half_win_sz, &win_sz);
-   fSetArray(nr, nc, 255.0 * 255.0, &minSAD);
-   iSetArray(nr, nc, max_shift, &retDisp);
-   iSetArray(1, 2, half_win_sz, &halfWin);
+   fSetArray_rep0(nr, nc, 255.0 * 255.0, &minSAD);
+   iSetArray_rep0(nr, nc, max_shift, &retDisp);
+   iSetArray_rep1(1, 2, half_win_sz, &halfWin);
    int decomp_0;
    getDisparity_out1(&decomp_0, &win_sz);
    if(decomp_0) {
-      padarray2(Ileft, halfWin, &IleftPadded);
-      padarray2(Iright, halfWin, &IrightPadded);
+      padarray2_rep0(Ileft, halfWin, &IleftPadded);
+      padarray2_rep1(Iright, halfWin, &IrightPadded);
    }
    else {
       getDisparity_out3(&(IleftPadded), Ileft, &(IrightPadded), Iright);
    }
    getDisparity_out2(&rows, IleftPadded, &cols);
-   fSetArray(rows, cols, 255, &SAD);
-   fSetArray(rows, cols, 0, &integralImg);
-   fMallocHandle(rows - win_sz, cols - win_sz, &retSAD);
-   iSetArray(rows, cols, 0, &Iright_moved);
+   fSetArray_rep1(rows, cols, 255, &SAD);
+   fSetArray_rep2(rows, cols, 0, &integralImg);
+   fMallocHandle_rep4(rows - win_sz, cols - win_sz, &retSAD);
+   iSetArray_rep2(rows, cols, 0, &Iright_moved);
    for(k = 0; k < max_shift; k++) {
       getDisparity_loop0(IleftPadded, IrightPadded, Iright_moved, &win_sz, &k, SAD, integralImg, retSAD, minSAD, retDisp, &nr, &nc);
    }
-   fFreeHandle(retSAD);
-   fFreeHandle(minSAD);
-   fFreeHandle(SAD);
-   fFreeHandle(integralImg);
-   iFreeHandle(halfWin);
-   iFreeHandle(IrightPadded);
-   iFreeHandle(IleftPadded);
-   iFreeHandle(Iright_moved);
+   fFreeHandle_rep0(retSAD);
+   fFreeHandle_rep1(minSAD);
+   fFreeHandle_rep2(SAD);
+   fFreeHandle_rep3(integralImg);
+   iFreeHandle_rep1(halfWin);
+   iFreeHandle_rep2(IrightPadded);
+   iFreeHandle_rep3(IleftPadded);
+   iFreeHandle_rep4(Iright_moved);
    *rtr_val = retDisp;
    
    return;
@@ -239,9 +505,125 @@ void iFreeHandle_out0(int *decomp_0, I2D *out) {
    (*decomp_0) = out != ((void *) 0);
 }
 
+void iFreeHandle_out0_rep8(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void iFreeHandle_out0_rep7(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void iFreeHandle_out0_rep6(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void iFreeHandle_out0_rep5(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void iFreeHandle_out0_rep4(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void iFreeHandle_out0_rep3(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void iFreeHandle_out0_rep2(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void iFreeHandle_out0_rep1(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
+void iFreeHandle_out0_rep0(int *decomp_0, I2D *out) {
+   (*decomp_0) = out != ((void *) 0);
+}
+
 void iFreeHandle(I2D *out) {
    int decomp_0;
-   iFreeHandle_out0(&decomp_0, out);
+   iFreeHandle_out0_rep0(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void iFreeHandle_rep7(I2D *out) {
+   int decomp_0;
+   iFreeHandle_out0_rep1(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void iFreeHandle_rep6(I2D *out) {
+   int decomp_0;
+   iFreeHandle_out0_rep2(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void iFreeHandle_rep5(I2D *out) {
+   int decomp_0;
+   iFreeHandle_out0_rep3(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void iFreeHandle_rep4(I2D *out) {
+   int decomp_0;
+   iFreeHandle_out0_rep4(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void iFreeHandle_rep3(I2D *out) {
+   int decomp_0;
+   iFreeHandle_out0_rep5(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void iFreeHandle_rep2(I2D *out) {
+   int decomp_0;
+   iFreeHandle_out0_rep6(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void iFreeHandle_rep1(I2D *out) {
+   int decomp_0;
+   iFreeHandle_out0_rep7(&decomp_0, out);
+   if(decomp_0) {
+      free(out);
+   }
+   
+   return;
+}
+
+void iFreeHandle_rep0(I2D *out) {
+   int decomp_0;
+   iFreeHandle_out0_rep8(&decomp_0, out);
    if(decomp_0) {
       free(out);
    }
@@ -254,12 +636,198 @@ void iMallocHandle_out0(I2D *out, int *rows, int *cols) {
    out->width = (*cols);
 }
 
+void iMallocHandle_out0_rep7(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep6(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep5(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep12(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep11(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep10(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep9(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep8(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep4(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep3(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep2(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep1(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
+void iMallocHandle_out0_rep0(I2D *out, int *rows, int *cols) {
+   out->height = (*rows);
+   out->width = (*cols);
+}
+
 void iMallocHandle(int rows, int cols, I2D **rtr_val) {
    int i;
    int j;
    I2D *out;
    out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
-   iMallocHandle_out0(out, &rows, &cols);
+   iMallocHandle_out0_rep0(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep6(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep1(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep5(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep2(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep4(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep3(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep3(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep4(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep2(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep8(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep10(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep9(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep9(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep10(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep8(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep11(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep7(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep12(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep1(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep6(out, &rows, &cols);
+   *rtr_val = out;
+   
+   return;
+}
+
+void iMallocHandle_rep0(int rows, int cols, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   out = (I2D *) malloc(sizeof(I2D) + sizeof(int) * rows * cols);
+   iMallocHandle_out0_rep7(out, &rows, &cols);
    *rtr_val = out;
    
    return;
@@ -269,7 +837,112 @@ void iSetArray(int rows, int cols, int val, I2D **rtr_val) {
    int i;
    int j;
    I2D *out;
-   iMallocHandle(rows, cols, &out);
+   iMallocHandle_rep1(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void iSetArray_rep3(int rows, int cols, int val, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   iMallocHandle_rep7(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void iSetArray_rep6(int rows, int cols, int val, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   iMallocHandle_rep8(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void iSetArray_rep5(int rows, int cols, int val, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   iMallocHandle_rep9(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void iSetArray_rep4(int rows, int cols, int val, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   iMallocHandle_rep10(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void iSetArray_rep2(int rows, int cols, int val, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   iMallocHandle_rep3(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void iSetArray_rep1(int rows, int cols, int val, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   iMallocHandle_rep4(rows, cols, &out);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         out->data[(i) * out->width + (j)] = val;
+      }
+   }
+   *rtr_val = out;
+   
+   return;
+}
+
+void iSetArray_rep0(int rows, int cols, int val, I2D **rtr_val) {
+   int i;
+   int j;
+   I2D *out;
+   iMallocHandle_rep5(rows, cols, &out);
    for(i = 0; i < rows; i++) {
       for(j = 0; j < cols; j++) {
          out->data[(i) * out->width + (j)] = val;
@@ -313,6 +986,33 @@ void padarray2_out0(int *rows, I2D *inMat, int *cols, int *bRows, I2D *borderMat
    (*newCols) = (*cols) + (*bCols) * 2;
 }
 
+void padarray2_out0_rep2(int *rows, I2D *inMat, int *cols, int *bRows, I2D *borderMat, int *bCols, int *newRows, int *newCols) {
+   (*rows) = inMat->height;
+   (*cols) = inMat->width;
+   (*bRows) = borderMat->data[0];
+   (*bCols) = borderMat->data[1];
+   (*newRows) = (*rows) + (*bRows) * 2;
+   (*newCols) = (*cols) + (*bCols) * 2;
+}
+
+void padarray2_out0_rep1(int *rows, I2D *inMat, int *cols, int *bRows, I2D *borderMat, int *bCols, int *newRows, int *newCols) {
+   (*rows) = inMat->height;
+   (*cols) = inMat->width;
+   (*bRows) = borderMat->data[0];
+   (*bCols) = borderMat->data[1];
+   (*newRows) = (*rows) + (*bRows) * 2;
+   (*newCols) = (*cols) + (*bCols) * 2;
+}
+
+void padarray2_out0_rep0(int *rows, I2D *inMat, int *cols, int *bRows, I2D *borderMat, int *bCols, int *newRows, int *newCols) {
+   (*rows) = inMat->height;
+   (*cols) = inMat->width;
+   (*bRows) = borderMat->data[0];
+   (*bCols) = borderMat->data[1];
+   (*newRows) = (*rows) + (*bRows) * 2;
+   (*newCols) = (*cols) + (*bCols) * 2;
+}
+
 void padarray2(I2D *inMat, I2D *borderMat, I2D **rtr_val) {
    int j;
    int i;
@@ -323,8 +1023,52 @@ void padarray2(I2D *inMat, I2D *borderMat, I2D **rtr_val) {
    int bRows;
    int cols;
    int rows;
-   padarray2_out0(&rows, inMat, &cols, &bRows, borderMat, &bCols, &newRows, &newCols);
-   iSetArray(newRows, newCols, 0, &paddedArray);
+   padarray2_out0_rep0(&rows, inMat, &cols, &bRows, borderMat, &bCols, &newRows, &newCols);
+   iSetArray_rep4(newRows, newCols, 0, &paddedArray);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         paddedArray->data[((bRows + i)) * paddedArray->width + ((bCols + j))] = inMat->data[(i) * inMat->width + (j)];
+      }
+   }
+   *rtr_val = paddedArray;
+   
+   return;
+}
+
+void padarray2_rep1(I2D *inMat, I2D *borderMat, I2D **rtr_val) {
+   int j;
+   int i;
+   I2D *paddedArray;
+   int newCols;
+   int newRows;
+   int bCols;
+   int bRows;
+   int cols;
+   int rows;
+   padarray2_out0_rep1(&rows, inMat, &cols, &bRows, borderMat, &bCols, &newRows, &newCols);
+   iSetArray_rep5(newRows, newCols, 0, &paddedArray);
+   for(i = 0; i < rows; i++) {
+      for(j = 0; j < cols; j++) {
+         paddedArray->data[((bRows + i)) * paddedArray->width + ((bCols + j))] = inMat->data[(i) * inMat->width + (j)];
+      }
+   }
+   *rtr_val = paddedArray;
+   
+   return;
+}
+
+void padarray2_rep0(I2D *inMat, I2D *borderMat, I2D **rtr_val) {
+   int j;
+   int i;
+   I2D *paddedArray;
+   int newCols;
+   int newRows;
+   int bCols;
+   int bRows;
+   int cols;
+   int rows;
+   padarray2_out0_rep2(&rows, inMat, &cols, &bRows, borderMat, &bCols, &newRows, &newCols);
+   iSetArray_rep6(newRows, newCols, 0, &paddedArray);
    for(i = 0; i < rows; i++) {
       for(j = 0; j < cols; j++) {
          paddedArray->data[((bRows + i)) * paddedArray->width + ((bCols + j))] = inMat->data[(i) * inMat->width + (j)];
@@ -465,7 +1209,7 @@ I2D * readImage(char const *pathName) {
       fread(&vert_reso, sizeof((((((vert_reso)))))), 1, input);
       fread(&no_of_colors, sizeof((((((no_of_colors)))))), 1, input);
       fread(&no_of_imp_colors, sizeof((((((no_of_imp_colors)))))), 1, input);
-      iMallocHandle(height, width, &srcImage);
+      iMallocHandle_rep6(height, width, &srcImage);
       if(srcImage->height <= 0 || srcImage->width <= 0 || signature[0] != 'B' || signature[1] != 'M' || (bits_per_pixel != 24 && bits_per_pixel != 8)) {
          printf("ERROR in BMP read: The input file is not in standard BMP format");
          
@@ -539,9 +1283,9 @@ int main(int argc, char *argv[]) {
    }
    elapsed = photonReportTiming(start, endC);
    photonPrintTiming(elapsed);
-   iFreeHandle(imleft);
-   iFreeHandle(imright);
-   iFreeHandle(retDisparity);
+   iFreeHandle_rep5(imleft);
+   iFreeHandle_rep6(imright);
+   iFreeHandle_rep7(retDisparity);
    free(start);
    free(endC);
    free(elapsed);

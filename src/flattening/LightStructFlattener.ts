@@ -3,19 +3,22 @@ import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
 import { ArrayType, Call, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, Statement, Type, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
+import { Voidifier } from "../function/Voidifier.js";
 
 export class LightStructFlattener extends StructFlatteningAlgorithm {
     constructor(silent: boolean = false) {
         super("StructFlattener", silent);
     }
 
-    public decompose(fields: Field[], name: string, startingPoint?: FunctionJp): void {
-        const funs = this.extractFunctionCalls(startingPoint);
-        this.log(`Found ${funs.length} functions to flatten struct ${name} in`);
-
-        funs.forEach((fun) => {
+    public decompose(fields: Field[], name: string, functions: FunctionJp[]): void {
+        functions.forEach((fun) => {
             this.flattenInFunction(fun, fields, name);
         });
+
+        const topFunction = functions[0];
+        if (topFunction) {
+            this.buildTopFunctionInterface(name, topFunction, fields);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -265,6 +268,50 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             }
         }
     }
+
+    private buildTopFunctionInterface(name: string, topFunction: FunctionJp, fields: Field[]) {
+        this.log("----------------------------------------------------------------------");
+        this.log(`Building struct to flat mapping for struct ${name} before calls to ${topFunction.name}()`);
+        for (const call of Query.search(Call, { name: topFunction.name })) {
+            this.buildStructToFlatMap(fields, name, call);
+        }
+        this.log("----------------------------------------------------------------------");
+    }
+
+    private buildStructToFlatMap(fields: Field[], structName: string, call: Call): void {
+        this.log(`Building ${structName} mapping at call spot ${call.name}():${call.line}`);
+
+        const newVars = new Map<string, DeclStmt>();
+
+        for (const arg of call.argList) {
+            const strippedArgName = arg.code.replace("*", "").replace("&", "").replace("(", "").replace(")", "").trim();
+            const argType = this.getBaseType(arg.type);
+
+            if (argType.code.includes(structName)) {
+                fields.forEach((field) => {
+                    const newVarName = `${strippedArgName}_${field.name}`;
+                    const baseType = this.getBaseType(field.type);
+                    const newVarType = arg.type.isPointer ? ClavaJoinPoints.pointer(baseType) : baseType;
+
+                    const init = arg.type.isPointer ?
+                        ClavaJoinPoints.exprLiteral(`&(${strippedArgName}->${field.name})`) :
+                        ClavaJoinPoints.exprLiteral(`${strippedArgName}.${field.name}`);
+                    init.setType(newVarType);
+
+                    const newVarDecl = ClavaJoinPoints.varDecl(newVarName, init);
+                    const newDeclStmt = ClavaJoinPoints.declStmt(newVarDecl);
+                    newVars.set(newVarName, newDeclStmt);
+                });
+            }
+        }
+        const parentStmt = call.parent;
+        newVars.forEach((declStmt) => {
+            parentStmt.insertBefore(declStmt);
+        });
+
+        this.flattenCall(call, fields, structName);
+    }
+
     // -----------------------------------------------------------------------
     private getBaseType(type: Type): Type {
         const typeStr = type.code.replace("*", "").replace("&", "").replace("const", "").replace("[]", "").trim();

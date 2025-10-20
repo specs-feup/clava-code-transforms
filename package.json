@@ -41,6 +41,8 @@
     "./FoldingPropagationCombiner": "./dist/src/constfolding/FoldingPropagationCombiner.js",
     "./ArrayFlattener": "./dist/src/flattening/ArrayFlattener.js",
     "./StructFlattener": "./dist/src/flattening/StructFlattener.js",
+    "./LightStructFlattener": "./dist/src/flattening/LightStructFlattener.js",
+    "./LegacyStructDecomposer": "./dist/src/flattening/legacy/LegacyStructDecomposer.js",
     "./ScopeFlattener": "./dist/src/flattening/ScopeFlattener.js",
     "./Outliner": "./dist/src/function/Outliner.js",
     "./Voidifier": "./dist/src/function/Voidifier.js",
