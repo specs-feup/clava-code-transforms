@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayType, Call, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, Statement, Type, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayType, BinaryOp, Call, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 import { Voidifier } from "../function/Voidifier.js";
@@ -28,6 +28,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         let changes = 0;
         changes += this.flattenParams(fun, fields, name);
         changes += this.flattenMemberRefs(fun, fields, name);
+        changes += this.flattenNullComparison(fun, fields, name);
         changes += this.flattenDecls(fun, fields, name);
         changes += this.flattenAssignments(fun, fields, name);
         changes += this.flattenCalls(fun, fields, name);
@@ -112,7 +113,28 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                         member.replaceWith(newVarref);
                     }
                     changes++;
+                    this.log(`  Flattened member ref ${ref.name}${member.arrow ? "->" : "."}${fieldName}`);
                 }
+            }
+        }
+        return changes;
+    }
+
+    private flattenNullComparison(fun: FunctionJp, fields: Field[], name: string): number {
+        let changes = 0;
+
+        for (const ref of Query.searchFrom(fun, Varref)) {
+            const type = ref.type;
+            if (!type.code.includes(name)) {
+                continue;
+            }
+
+            // foo = bar != nullptr
+            if (ref.parent instanceof BinaryOp && (ref.parent.operator == "!=" || ref.parent.operator == "==")) {
+                const newRef = ClavaJoinPoints.exprLiteral(`${ref.name}_${fields[0].name}`);
+                ref.replaceWith(newRef);
+                changes++;
+                this.log(`  Flattened struct ref ${ref.name} in null comparison`);
             }
         }
         return changes;
