@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayType, BinaryOp, Call, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayType, BinaryOp, Call, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, ParenExpr, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 import { Voidifier } from "../function/Voidifier.js";
@@ -72,14 +72,19 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     private flattenParam(param: Param, fields: Field[]): Param[] {
         // assuming params are structs, not arrays of structs
         const type = param.type;
-        const isPointer = type.isPointer;
 
         const newParams: Param[] = [];
         fields.forEach((field) => {
             const newParamName = `${param.name}_${field.name}`;
-            const baseType = this.getBaseType(field.type);
-            const newParamType = isPointer ? ClavaJoinPoints.pointer(baseType) : baseType;
-            const newParam = ClavaJoinPoints.param(newParamName, newParamType);
+            let indirection = this.getLevelOfIndirection(type);
+
+            let newType = this.getBaseType(field.type);
+            while (indirection > 0) {
+                newType = ClavaJoinPoints.pointer(newType);
+                indirection--;
+            }
+
+            const newParam = ClavaJoinPoints.param(newParamName, newType);
             newParams.push(newParam);
         });
         return newParams;
@@ -184,26 +189,37 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     private flattenAssignments(fun: FunctionJp, fields: Field[], name: string): number {
         let changes = 0;
 
-        for (const ref of Query.searchFrom(fun, Varref)) {
+        const refs = Query.searchFrom(fun, Varref).get();
+        for (const ref of refs) {
+            if (ref.parent == null) {
+                continue;
+            }
+
             const type = ref.type;
             if (!type.code.includes(name)) {
                 continue;
             }
 
-            // foo = 
             if (ref.parent instanceof BinaryOp && ref.parent.operator == "=") {
                 const assign = ref.parent as BinaryOp;
-                const isLeft = assign.left.astId === ref.astId;
-                if (!isLeft) {
-                    continue;
-                }
                 const rhs = assign.right;
+                const lhs = assign.left;
 
-                const isMallocAssignment = Query.searchFrom(rhs, Call, { name: "malloc" }).get().length > 0;
-                if (isMallocAssignment) {
+                const hasMalloc = Query.searchFromInclusive(rhs, Call, { name: "malloc" }).get().length > 0;
+                const lhsHasRef = Query.searchFromInclusive(lhs, Varref).get().some((l) => l.type.code.includes(name));
+                const rhsHasRef = Query.searchFromInclusive(rhs, Varref).get().some((r) => r.type.code.includes(name));
+
+                if (hasMalloc && lhsHasRef) {
                     this.flattenMallocAssignment(assign, fields, name);
                     changes++;
                     this.log(`  Flattened malloc assignment to ${ref.name}`);
+                    continue;
+                }
+
+                if (lhsHasRef && rhsHasRef) {
+                    this.flattenStructPointerAssignment(assign, fields, name);
+                    changes++;
+                    this.log(`  Flattened struct pointer assignment to ${ref.name}`);
                     continue;
                 }
             }
@@ -255,6 +271,33 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             const newMalloc = ClavaJoinPoints.callFromName("malloc", ClavaJoinPoints.pointer(baseType), fieldSizeExpr);
             const newAssign = ClavaJoinPoints.binaryOp("=", newLhs, newMalloc);
 
+            parentStmt.insertBefore(ClavaJoinPoints.exprStmt(newAssign));
+        }
+        parentStmt.detach();
+    }
+
+    private flattenStructPointerAssignment(assign: BinaryOp, fields: Field[], name: string): void {
+        const lhs = assign.left;
+        const rhs = assign.right;
+        const parentStmt = assign.getAncestor("statement") as Statement;
+
+        const lhsVar = Query.searchFromInclusive(lhs, Varref).first()!;
+        const rhsVar = Query.searchFromInclusive(rhs, Varref).first()!;
+
+        for (const field of fields) {
+            const newLhsName = `${lhsVar.name}_${field.name}`;
+            let newLhs = ClavaJoinPoints.exprLiteral(newLhsName);
+            if (lhsVar.parent instanceof UnaryOp && lhsVar.parent.operator === "*") {
+                newLhs = ClavaJoinPoints.exprLiteral(`*${newLhsName}`);
+            }
+
+            const newRhsName = `${rhsVar.name}_${field.name}`;
+            let newRhs = ClavaJoinPoints.exprLiteral(newRhsName);
+            if (rhsVar.parent instanceof UnaryOp && rhsVar.parent.operator === "*") {
+                newRhs = ClavaJoinPoints.exprLiteral(`*${newRhsName}`);
+            }
+
+            const newAssign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
             parentStmt.insertBefore(ClavaJoinPoints.exprStmt(newAssign));
         }
         parentStmt.detach();
@@ -414,6 +457,17 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     private getBaseType(type: Type): Type {
         const typeStr = type.code.replace("*", "").replace("&", "").replace("const", "").replace("[]", "").trim();
         return ClavaJoinPoints.type(typeStr);
+    }
+
+    private getLevelOfIndirection(type: Type): number {
+        let level = 0;
+        let typeStr = type.code;
+
+        while (typeStr.includes("*")) {
+            level++;
+            typeStr = typeStr.replace("*", "").trim();
+        }
+        return level;
     }
 
     private fieldIsArray(member: MemberAccess, fields: Field[]): boolean {
