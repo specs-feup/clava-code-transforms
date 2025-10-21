@@ -9,6 +9,7 @@ import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 export class LightStructFlattener extends StructFlatteningAlgorithm {
     constructor(silent: boolean = false) {
         super("StructFlattener", silent);
+        this.setSilent(true);
     }
 
     public decompose(fields: Field[], name: string, functions: FunctionJp[]): void {
@@ -357,13 +358,13 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         if (arg.code.includes("(")) {
             const openIdx = arg.code.indexOf("(");
             const closeIdx = arg.code.lastIndexOf(")");
-            prefix = arg.code.substring(0, openIdx + 1);
+            prefix = arg.code.substring(0, openIdx);
             argName = arg.code.substring(openIdx + 1, closeIdx);
             suffix = arg.code.substring(closeIdx);
         }
 
         fields.forEach((field) => {
-            const newArgName = `${argName}_${field.name}`;
+            const newArgName = `${prefix}${argName}_${field.name}`;
             const newArg = ClavaJoinPoints.exprLiteral(newArgName);
             newArgs.push(newArg);
         });

@@ -3,6 +3,7 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import { LegacyStructFlattener } from "./legacy/LegacyStructFlattener.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
+import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
 export class StructFlattener extends AdvancedTransform {
     private algorithm: StructFlatteningAlgorithm;
@@ -14,6 +15,7 @@ export class StructFlattener extends AdvancedTransform {
     }
 
     public flattenAll(startingPoint?: FunctionJp): string[] {
+        const funs = this.extractFunctionCalls(startingPoint);
         const structs = this.findAllStructs();
         this.log(`Found ${structs.length} regular structs`);
 
@@ -28,7 +30,7 @@ export class StructFlattener extends AdvancedTransform {
 
         totalStructs.forEach(([name, struct]) => {
             this.log(`Flattening struct ${name}`);
-            const funs = this.extractFunctionCalls(startingPoint);
+
             this.algorithm.decompose(struct.fields, name, funs);
             decompNames.push(name);
             this.log(`Done flattening struct ${name}`);
@@ -39,6 +41,7 @@ export class StructFlattener extends AdvancedTransform {
     }
 
     public flattenByName(name: string, startingPoint?: FunctionJp): void {
+        const funs = this.extractFunctionCalls(startingPoint);
         const structs = [
             ...this.findAllStructs(),
             ...this.findAllStructlikeClasses()
@@ -48,7 +51,7 @@ export class StructFlattener extends AdvancedTransform {
             const elemStruct = elem[1];
 
             if (elemName === name) {
-                const funs = this.extractFunctionCalls(startingPoint);
+
                 this.algorithm.decompose(elemStruct.fields, name, funs);
             }
         });
