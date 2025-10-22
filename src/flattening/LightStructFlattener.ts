@@ -1,10 +1,11 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayType, BinaryOp, Call, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, MemberAccess, Param, ParenExpr, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayType, BinaryOp, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 import { Voidifier } from "../function/Voidifier.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
+import { VisualizationTool } from "@specs-feup/clava-visualization/api/VisualizationTool.js";
 
 export class LightStructFlattener extends StructFlatteningAlgorithm {
     constructor(silent: boolean = false) {
@@ -192,7 +193,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
         const refs = Query.searchFrom(fun, Varref).get();
         for (const ref of refs) {
-            if (ref.parent == null) {
+            if (ref.parent == null || ref.getAncestor("body") == null) {
                 continue;
             }
 
@@ -201,28 +202,42 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                 continue;
             }
 
-            if (ref.parent instanceof BinaryOp && ref.parent.operator == "=") {
-                const assign = ref.parent as BinaryOp;
-                const rhs = assign.right;
-                const lhs = assign.left;
+            const stmt = ref.getAncestor("statement") as Statement;
+            const assign = (stmt.children[0] instanceof BinaryOp) ? stmt.children[0] as BinaryOp : null;
+            if (assign != null && assign.operator == "=") {
+                const rhs = assign.children[1] as Expression;
+                const lhs = assign.children[0] as Expression;
+                if (rhs == null) {
+                    this.logWarning(`  Could not flatten assignment "${stmt.code}" in function ${fun.name} (missing rhs)`);
+                    continue;
+                }
+                if (lhs == null) {
+                    this.logWarning(`  Could not flatten assignment "${stmt.code}" in function ${fun.name} (missing lhs)`);
+                    continue;
+                }
 
                 const hasMalloc = Query.searchFromInclusive(rhs, Call, { name: "malloc" }).get().length > 0;
-                const lhsHasRef = Query.searchFromInclusive(lhs, Varref).get().some((l) => l.type.code.includes(name));
-                const rhsHasRef = Query.searchFromInclusive(rhs, Varref).get().some((r) => r.type.code.includes(name));
+                const lhsHasRef = Query.searchFromInclusive(lhs, Varref).get().some((l) => l.type != null ? l.type.code.includes(name) : false);
+                const rhsHasRef = Query.searchFromInclusive(rhs, Varref).get().some((r) => r.type != null ? r.type.code.includes(name) : false);
+                const hasNullptr = rhs.code.replace(" ", "").includes("(void*) 0") || rhs.code.replace(" ", "").includes("NULL");
 
                 if (hasMalloc && lhsHasRef) {
                     this.flattenMallocAssignment(assign, fields, name);
-                    changes++;
-                    this.log(`  Flattened malloc assignment to ${ref.name}`);
-                    continue;
+                }
+                else if (lhsHasRef && rhsHasRef) {
+                    this.flattenStructPointerAssignment(assign, fields, name);
                 }
 
-                if (lhsHasRef && rhsHasRef) {
-                    this.flattenStructPointerAssignment(assign, fields, name);
-                    changes++;
-                    this.log(`  Flattened struct pointer assignment to ${ref.name}`);
+                else if (lhsHasRef && !rhsHasRef && hasNullptr) {
+                    this.flattenNullToStructAssignment(lhs, stmt, fields, name);
+                }
+                else {
+                    this.logWarning(`  Could not flatten assignment "${assign.code}" in function ${fun.name}`);
+                    this.logWarning(`    LHS: ${lhs.code}, RHS: ${rhs.code}, hasMalloc: ${hasMalloc}, lhsHasRef: ${lhsHasRef}, rhsHasRef: ${rhsHasRef}, hasNullptr: ${hasNullptr}`);
                     continue;
                 }
+                changes++;
+                this.log(`  Flattened struct pointer assignment involving ${ref.name}`);
             }
         }
         return changes;
@@ -299,6 +314,27 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             }
 
             const newAssign = ClavaJoinPoints.binaryOp("=", newLhs, newRhs);
+            parentStmt.insertBefore(ClavaJoinPoints.exprStmt(newAssign));
+        }
+        parentStmt.detach();
+    }
+
+    private flattenNullToStructAssignment(lhs: Expression, parentStmt: Statement, fields: Field[], name: string): void {
+        // supports foo = NULL, *foo = NULL, &foo = NULL, where foo is a struct pointer
+        for (const field of fields) {
+            const baseLhsName = Query.searchFromInclusive(lhs, Varref).first()!.name;
+            const newLhsName = `${baseLhsName}_${field.name}`;
+
+            let newLhs = ClavaJoinPoints.exprLiteral(newLhsName);
+            if (lhs instanceof UnaryOp && lhs.operator === "*") {
+                newLhs = ClavaJoinPoints.exprLiteral(`*${newLhsName}`);
+            }
+            if (lhs instanceof UnaryOp && lhs.operator === "&") {
+                newLhs = ClavaJoinPoints.exprLiteral(`&${newLhsName}`);
+            }
+
+            const nullExpr = ClavaJoinPoints.exprLiteral("((void *) 0)");
+            const newAssign = ClavaJoinPoints.binaryOp("=", newLhs, nullExpr);
             parentStmt.insertBefore(ClavaJoinPoints.exprStmt(newAssign));
         }
         parentStmt.detach();
