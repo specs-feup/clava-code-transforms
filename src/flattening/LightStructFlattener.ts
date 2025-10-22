@@ -13,7 +13,9 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         this.setSilent(true);
     }
 
-    public decompose(fields: Field[], name: string, functions: FunctionJp[]): void {
+    public flatten(fields: Field[], name: string, functions: FunctionJp[]): void {
+        this.flattenGlobals(fields, name);
+
         functions.forEach((fun) => {
             this.flattenInFunction(fun, fields, name);
         });
@@ -25,6 +27,12 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     }
 
     // -----------------------------------------------------------------------
+    private flattenGlobals(fields: Field[], name: string): void {
+        for (const decl of Query.search(Vardecl, { isGlobal: true })) {
+            this.flattenDecl(decl, fields);
+        }
+    }
+
     private flattenInFunction(fun: FunctionJp, fields: Field[], name: string) {
         this.log("----------------------------------------------------------------------");
         this.log(`Flattening struct ${name} in function ${fun.name}`);

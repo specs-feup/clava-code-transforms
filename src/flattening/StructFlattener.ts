@@ -31,7 +31,7 @@ export class StructFlattener extends AdvancedTransform {
         totalStructs.forEach(([name, struct]) => {
             this.log(`Flattening struct ${name}`);
 
-            this.algorithm.decompose(struct.fields, name, funs);
+            this.algorithm.flatten(struct.fields, name, funs);
             decompNames.push(name);
             this.log(`Done flattening struct ${name}`);
         });
@@ -52,7 +52,7 @@ export class StructFlattener extends AdvancedTransform {
 
             if (elemName === name) {
 
-                this.algorithm.decompose(elemStruct.fields, name, funs);
+                this.algorithm.flatten(elemStruct.fields, name, funs);
             }
         });
     }
@@ -60,7 +60,7 @@ export class StructFlattener extends AdvancedTransform {
     public flattenStruct(struct: Struct, startingPoint?: FunctionJp): void {
         const name = this.getStructName(struct);
         const funs = this.extractFunctionCalls(startingPoint);
-        this.algorithm.decompose(struct.fields, name, funs);
+        this.algorithm.flatten(struct.fields, name, funs);
     }
 
     // -----------------------------------------------------------------------

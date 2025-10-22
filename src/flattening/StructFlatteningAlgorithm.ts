@@ -7,5 +7,5 @@ export abstract class StructFlatteningAlgorithm extends AdvancedTransform {
         super(name, silent);
     }
 
-    public abstract decompose(fields: Joinpoint[], structName: string, functions: FunctionJp[]): void;
+    public abstract flatten(fields: Joinpoint[], structName: string, functions: FunctionJp[]): void;
 }
