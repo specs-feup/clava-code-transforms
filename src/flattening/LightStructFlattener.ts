@@ -98,11 +98,28 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         for (const ref of Query.searchFrom(fun, Varref)) {
             const type = ref.type;
             if (type.code.includes(name)) {
-                const member = ref.parent;
+                let member: MemberAccess;
+                let isDeref = false;
 
-                if (member instanceof MemberAccess) {
+                // foo->bar
+                if (ref.parent instanceof MemberAccess) {
+                    member = ref.parent;
+                }
+                // (*foo).bar
+                if (ref.parent instanceof UnaryOp && ref.parent.operator === "*") {
+                    if (ref.parent.parent instanceof MemberAccess) {
+                        member = ref.parent.parent;
+                    }
+                    if (ref.parent.parent instanceof ParenExpr && ref.parent.parent.parent instanceof MemberAccess) {
+                        member = ref.parent.parent.parent;
+                    }
+                    isDeref = true;
+                }
+
+                if (member! instanceof MemberAccess) {
                     const fieldName = member.name;
-                    const newVarrefName = `${ref.name}_${fieldName}`;
+                    const baseVarrefName = `${ref.name}_${fieldName}`;
+                    const newVarrefName = isDeref ? `(*${baseVarrefName})` : baseVarrefName;
                     const newVarref = ClavaJoinPoints.exprLiteral(newVarrefName);
 
                     if (member.arrow) {
