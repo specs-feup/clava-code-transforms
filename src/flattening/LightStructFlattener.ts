@@ -488,9 +488,18 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                     const baseType = this.getBaseType(field.type);
                     const newVarType = arg.type.isPointer ? ClavaJoinPoints.pointer(baseType) : baseType;
 
-                    const init = arg.type.isPointer ?
-                        ClavaJoinPoints.exprLiteral(`&(${strippedArgName}->${field.name})`) :
-                        ClavaJoinPoints.exprLiteral(`${strippedArgName}.${field.name}`);
+                    let init: Expression;
+                    if (arg.type.isPointer) {
+                        if (field.type.isArray) {
+                            init = ClavaJoinPoints.exprLiteral(`${strippedArgName}->${field.name}`);
+                        }
+                        else {
+                            init = ClavaJoinPoints.exprLiteral(`&(${strippedArgName}->${field.name})`);
+                        }
+                    }
+                    else {
+                        init = ClavaJoinPoints.exprLiteral(`${strippedArgName}.${field.name}`);
+                    }
                     init.setType(newVarType);
 
                     const newVarDecl = ClavaJoinPoints.varDecl(newVarName, init);
