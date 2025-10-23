@@ -127,7 +127,8 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             const type = ref.type;
             if (type.code.includes(name)) {
                 const isSimpleMemberAccess = ref.parent instanceof MemberAccess;
-                const isDerefMemberAccess = (ref.parent instanceof UnaryOp) && (ref.parent.operator === "*" || ref.parent.operator === "&") && (ref.parent.parent instanceof MemberAccess);
+                const isDerefMemberAccess = (ref.parent instanceof UnaryOp) &&
+                    ((ref.parent.parent instanceof MemberAccess) || (ref.parent.parent instanceof ParenExpr && ref.parent.parent.parent instanceof MemberAccess));
 
                 if (isSimpleMemberAccess || isDerefMemberAccess) {
                     changes += this.flattenSimpleMemberAccess(ref, fields, changes);
@@ -147,26 +148,28 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     private flattenSimpleMemberAccess(ref: Varref, fields: Field[], changes: number) {
         let member: MemberAccess;
         let isDeref = false;
+        let isAddrOf = false;
 
         // foo->bar
         if (ref.parent instanceof MemberAccess) {
             member = ref.parent;
         }
-        // (*foo).bar
-        if (ref.parent instanceof UnaryOp && ref.parent.operator === "*") {
+        // (*foo)->bar or (&foo)->bar
+        if (ref.parent instanceof UnaryOp) {
             if (ref.parent.parent instanceof MemberAccess) {
                 member = ref.parent.parent;
             }
             if (ref.parent.parent instanceof ParenExpr && ref.parent.parent.parent instanceof MemberAccess) {
                 member = ref.parent.parent.parent;
             }
-            isDeref = true;
+            isDeref = ref.parent.operator === "*";
+            isAddrOf = ref.parent.operator === "&";
         }
 
         if (member! instanceof MemberAccess) {
             const fieldName = member.name;
             const baseVarrefName = `${ref.name}_${fieldName}`;
-            const newVarrefName = isDeref ? `(*${baseVarrefName})` : baseVarrefName;
+            const newVarrefName = isDeref ? `(*${baseVarrefName})` : (isAddrOf ? `(&${baseVarrefName})` : baseVarrefName);
             const newVarref = ClavaJoinPoints.exprLiteral(newVarrefName);
 
             if (member.arrow) {
@@ -196,16 +199,25 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         const arrayAccess = ref.parent as ArrayAccess;
         const memberAccess = arrayAccess.parent as MemberAccess;
         const indexExprs = arrayAccess.children.splice(1);
+        const hasTopExpr = memberAccess.parent instanceof ArrayAccess;
+        if (hasTopExpr) {
+            indexExprs.push(memberAccess.parent.children[1]);
+        }
 
-        const fieldName = memberAccess.name;
+        const fieldName = memberAccess.name!;
+        const field = fields.find((f) => f.name === fieldName)!;
         const baseVarrefName = `${ref.name}_${fieldName}`;
         let newVarref = `${baseVarrefName}${indexExprs.map((expr) => `[${expr.code}]`).join("")}`;
-        if (memberAccess.arrow) {
+        if (memberAccess.arrow && !field.type.isArray) {
             newVarref = `(*${newVarref})`;
         }
         const newVarrefJp = ClavaJoinPoints.exprLiteral(newVarref);
-        memberAccess.replaceWith(newVarrefJp);
-
+        if (!hasTopExpr) {
+            memberAccess.replaceWith(newVarrefJp);
+        }
+        else {
+            memberAccess.parent.replaceWith(newVarrefJp);
+        }
         return 1;
     }
 
