@@ -14,26 +14,44 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     }
 
     public flatten(fields: Field[], name: string, functions: FunctionJp[]): void {
-        this.flattenGlobals(fields, name);
+        let nChanges = this.flattenGlobals(fields, name);
 
         functions.forEach((fun) => {
-            this.flattenInFunction(fun, fields, name);
+            nChanges += this.flattenInFunction(fun, fields, name);
         });
 
         const topFunction = functions[0];
         if (topFunction) {
             this.buildTopFunctionInterface(name, topFunction, fields);
         }
+        this.log(`Total occurrences of struct ${name} flattened: ${nChanges}`);
     }
 
     // -----------------------------------------------------------------------
-    private flattenGlobals(fields: Field[], name: string): void {
+    private flattenGlobals(fields: Field[], name: string): number {
+        let changes = 0;
+        this.log("----------------------------------------------------------------------");
+        this.log(`Flattening struct ${name} in global scope`);
+
         for (const decl of Query.search(Vardecl, { isGlobal: true })) {
-            this.flattenDecl(decl, fields);
+            const newDecls = this.flattenDecl(decl, fields);
+            const parent = decl.getAncestor("statement") as DeclStmt;
+            newDecls.forEach((newDecl) => {
+                parent.insertBefore(newDecl);
+            });
+            parent.detach();
+
+            this.log(`  Flattened global decl ${decl.name}`);
         }
+        if (changes === 0) {
+            this.log(`No occurrences of struct ${name} found in global scope`);
+        } else {
+            this.log(`Flattened all ${changes} occurrences of struct ${name} in global scope`);
+        }
+        return changes;
     }
 
-    private flattenInFunction(fun: FunctionJp, fields: Field[], name: string) {
+    private flattenInFunction(fun: FunctionJp, fields: Field[], name: string): number {
         this.log("----------------------------------------------------------------------");
         this.log(`Flattening struct ${name} in function ${fun.name}`);
         let changes = 0;
@@ -49,6 +67,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         } else {
             this.log(`No occurrences of struct ${name} found in function ${fun.name}`);
         }
+        return changes;
     }
 
     private flattenParams(fun: FunctionJp, fields: Field[], name: string): number {
