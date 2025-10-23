@@ -273,7 +273,14 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         fields.forEach((field) => {
             const newDeclName = `${decl.name}_${field.name}`;
             const baseType = this.getBaseType(field.type);
-            const newDeclType = decl.type.isPointer ? ClavaJoinPoints.pointer(baseType) : baseType;
+
+            let newDeclType = ClavaJoinPoints.pointer(baseType);
+            if (decl.type.isPointer) {
+                for (let i = 0; i < this.getLevelOfIndirection(decl.type) - 1; i++) {
+                    newDeclType = ClavaJoinPoints.pointer(newDeclType);
+                }
+            }
+
             const newDecl = ClavaJoinPoints.varDeclNoInit(newDeclName, newDeclType);
             const declStmt = ClavaJoinPoints.declStmt(newDecl);
             declStmts.push(declStmt);
