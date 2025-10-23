@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayType, BinaryOp, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, ArrayType, BinaryOp, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 import { Voidifier } from "../function/Voidifier.js";
@@ -126,51 +126,87 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         for (const ref of Query.searchFrom(fun, Varref)) {
             const type = ref.type;
             if (type.code.includes(name)) {
-                let member: MemberAccess;
-                let isDeref = false;
+                const isSimpleMemberAccess = ref.parent instanceof MemberAccess;
+                const isDerefMemberAccess = (ref.parent instanceof UnaryOp) && (ref.parent.operator === "*" || ref.parent.operator === "&") && (ref.parent.parent instanceof MemberAccess);
 
-                // foo->bar
-                if (ref.parent instanceof MemberAccess) {
-                    member = ref.parent;
-                }
-                // (*foo).bar
-                if (ref.parent instanceof UnaryOp && ref.parent.operator === "*") {
-                    if (ref.parent.parent instanceof MemberAccess) {
-                        member = ref.parent.parent;
-                    }
-                    if (ref.parent.parent instanceof ParenExpr && ref.parent.parent.parent instanceof MemberAccess) {
-                        member = ref.parent.parent.parent;
-                    }
-                    isDeref = true;
+                if (isSimpleMemberAccess || isDerefMemberAccess) {
+                    changes += this.flattenSimpleMemberAccess(ref, fields, changes);
+                    continue;
                 }
 
-                if (member! instanceof MemberAccess) {
-                    const fieldName = member.name;
-                    const baseVarrefName = `${ref.name}_${fieldName}`;
-                    const newVarrefName = isDeref ? `(*${baseVarrefName})` : baseVarrefName;
-                    const newVarref = ClavaJoinPoints.exprLiteral(newVarrefName);
-
-                    if (member.arrow) {
-                        //foo->bar, where bar is a scalar
-                        if (!this.fieldIsArray(member, fields)) {
-                            const deref = ClavaJoinPoints.exprLiteral(`(*${newVarrefName})`);
-                            member.replaceWith(deref);
-                        }
-                        //foo->bar, where bar is an array
-                        else {
-                            member.replaceWith(newVarref);
-                        }
-                    }
-                    else {
-                        //foo.bar, where bar is anything
-                        member.replaceWith(newVarref);
-                    }
-                    changes++;
-                    this.log(`  Flattened member ref ${ref.name}${member.arrow ? "->" : "."}${fieldName}`);
+                const isArrayAccess = (ref.parent instanceof ArrayAccess) && (ref.parent.parent instanceof MemberAccess);
+                if (isArrayAccess) {
+                    changes += this.flattenArrayMemberAccess(ref, fields, changes);
+                    continue;
                 }
             }
         }
         return changes;
+    }
+
+    private flattenSimpleMemberAccess(ref: Varref, fields: Field[], changes: number) {
+        let member: MemberAccess;
+        let isDeref = false;
+
+        // foo->bar
+        if (ref.parent instanceof MemberAccess) {
+            member = ref.parent;
+        }
+        // (*foo).bar
+        if (ref.parent instanceof UnaryOp && ref.parent.operator === "*") {
+            if (ref.parent.parent instanceof MemberAccess) {
+                member = ref.parent.parent;
+            }
+            if (ref.parent.parent instanceof ParenExpr && ref.parent.parent.parent instanceof MemberAccess) {
+                member = ref.parent.parent.parent;
+            }
+            isDeref = true;
+        }
+
+        if (member! instanceof MemberAccess) {
+            const fieldName = member.name;
+            const baseVarrefName = `${ref.name}_${fieldName}`;
+            const newVarrefName = isDeref ? `(*${baseVarrefName})` : baseVarrefName;
+            const newVarref = ClavaJoinPoints.exprLiteral(newVarrefName);
+
+            if (member.arrow) {
+                //foo->bar, where bar is a scalar
+                if (!this.fieldIsArray(member, fields)) {
+                    const deref = ClavaJoinPoints.exprLiteral(`(*${newVarrefName})`);
+                    member.replaceWith(deref);
+                }
+
+                //foo->bar, where bar is an array
+                else {
+                    member.replaceWith(newVarref);
+                }
+            }
+            else {
+                //foo.bar, where bar is anything
+                member.replaceWith(newVarref);
+            }
+            changes++;
+            this.log(`  Flattened member ref ${ref.name}${member.arrow ? "->" : "."}${fieldName}`);
+        }
+        return changes;
+    }
+
+    private flattenArrayMemberAccess(ref: Varref, fields: Field[], changes: number): number {
+        console.log(ref);
+        const arrayAccess = ref.parent as ArrayAccess;
+        const memberAccess = arrayAccess.parent as MemberAccess;
+        const indexExprs = arrayAccess.children.splice(1);
+
+        const fieldName = memberAccess.name;
+        const baseVarrefName = `${ref.name}_${fieldName}`;
+        let newVarref = `${baseVarrefName}${indexExprs.map((expr) => `[${expr.code}]`).join("")}`;
+        if (memberAccess.arrow) {
+            newVarref = `(*${newVarref})`;
+        }
+        const newVarrefJp = ClavaJoinPoints.exprLiteral(newVarref);
+        memberAccess.replaceWith(newVarrefJp);
+
+        return 1;
     }
 
     private flattenNullComparison(fun: FunctionJp, fields: Field[], name: string): number {
@@ -433,22 +469,44 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
     private flattenCallArg(arg: Expression, fields: Field[]): Expression[] {
         const newArgs: Expression[] = [];
-        let [prefix, argName, suffix] = ["", arg.code, ""];
 
         // this only works because we know we only have expr that are at most (*argName) or (&argName)
-        if (arg.code.includes("(")) {
-            const openIdx = arg.code.indexOf("(");
-            const closeIdx = arg.code.lastIndexOf(")");
-            prefix = arg.code.substring(0, openIdx);
-            argName = arg.code.substring(openIdx + 1, closeIdx);
-            suffix = arg.code.substring(closeIdx);
-        }
+        if (!arg.code.includes("[") && !arg.code.includes("]")) {
+            let [prefix, argName, suffix] = ["", arg.code, ""];
 
-        fields.forEach((field) => {
-            const newArgName = `${prefix}${argName}_${field.name}`;
-            const newArg = ClavaJoinPoints.exprLiteral(newArgName);
-            newArgs.push(newArg);
-        });
+            if (arg.code.includes("(")) {
+                const openIdx = arg.code.indexOf("(");
+                const closeIdx = arg.code.lastIndexOf(")");
+                prefix = arg.code.substring(0, openIdx);
+                argName = arg.code.substring(openIdx + 1, closeIdx);
+                suffix = arg.code.substring(closeIdx);
+            }
+            fields.forEach((field) => {
+                const newArgName = `${prefix}${argName}_${field.name}`;
+                const newArg = ClavaJoinPoints.exprLiteral(newArgName);
+                newArgs.push(newArg);
+            });
+        }
+        else {
+            const arrayAccess = Query.searchFromInclusive(arg, ArrayAccess).first()!;
+            const indexExprs = arrayAccess.children.splice(1);
+            const varref = arrayAccess.children[0] as Varref;
+            const baseVarName = varref.name;
+            const deref = (arrayAccess.parent instanceof UnaryOp) && arrayAccess.parent.operator === "*";
+            const addrOf = (arrayAccess.parent instanceof UnaryOp) && arrayAccess.parent.operator === "&";
+
+            fields.forEach((field) => {
+                let newArgName = `${baseVarName}_${field.name}${indexExprs.map((expr) => `[${expr.code}]`).join("")}`;
+                if (deref) {
+                    newArgName = `(*${newArgName})`;
+                }
+                if (addrOf) {
+                    newArgName = `(&${newArgName})`;
+                }
+                const newArg = ClavaJoinPoints.exprLiteral(newArgName);
+                newArgs.push(newArg);
+            });
+        }
         return newArgs;
     }
 
