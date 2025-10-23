@@ -14,11 +14,12 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     }
 
     public flatten(fields: Field[], name: string, functions: FunctionJp[]): void {
-        let nChanges = this.flattenGlobals(fields, name);
+        let nChanges = 0;
 
         functions.forEach((fun) => {
             nChanges += this.flattenInFunction(fun, fields, name);
         });
+        nChanges += this.flattenGlobals(fields, name);
 
         const topFunction = functions[0];
         if (topFunction) {
@@ -33,13 +34,13 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         this.log("----------------------------------------------------------------------");
         this.log(`Flattening struct ${name} in global scope`);
 
-        for (const decl of Query.search(Vardecl, { isGlobal: true })) {
+        for (const decl of Query.search(Vardecl, (d) => d.type.code.includes(name) && d.isGlobal)) {
             const newDecls = this.flattenDecl(decl, fields);
             const parent = decl.getAncestor("statement") as DeclStmt;
             newDecls.forEach((newDecl) => {
                 parent.insertBefore(newDecl);
             });
-            parent.detach();
+            //parent.detach();
 
             this.log(`  Flattened global decl ${decl.name}`);
         }

@@ -25,7 +25,12 @@ export class StructFlattener extends AdvancedTransform {
         const totalStructs = [
             ...structs,
             ...classes
-        ];
+        ].sort((s1, s2) => {
+            const s1Name = s1[0];
+            const s2Name = s2[0];
+            return s1Name.localeCompare(s2Name);
+        });
+
         const decompNames: string[] = [];
 
         totalStructs.forEach(([name, struct]) => {
@@ -34,6 +39,11 @@ export class StructFlattener extends AdvancedTransform {
             this.algorithm.flatten(struct.fields, name, funs);
             decompNames.push(name);
             this.log(`Done flattening struct ${name}`);
+            try {
+                Clava.rebuild();
+            } catch (e) {
+                this.log(`Rebuild has errors after flattening ${name}`);
+            }
         });
         this.log(`Total flattened structs: ${decompNames.length}`);
 
