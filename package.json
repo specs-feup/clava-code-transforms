@@ -19,7 +19,7 @@
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
     "test:arrayflat-constprop": "clava dist/test/TestFlatteningConstant.js -- clang inputs/optical-flow/",
     "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
-    "test:hoisting": "clava dist/test/TestHoisting.js -- clang inputs/hoisting/",
+    "test:hoisting-malloc": "clava classic dist/test/TestMallocHoisting.js -p inputs/disparity/ -std c11",
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
     "test:outliner": "clava dist/test/TestOutliner.js -- clang inputs/outlining/",
     "test:outliner-edgecases": "clava dist/test/TestOutlinerEdgecases.js -- clang inputs/outlining-edgecases/",
@@ -47,7 +47,9 @@
     "./Outliner": "./dist/src/function/Outliner.js",
     "./Voidifier": "./dist/src/function/Voidifier.js",
     "./LoopCharacterizer": "./dist/src/loop/LoopCharacterizer.js",
-    "./Amalgamator": "./dist/src/program/Amalgamator.js"
+    "./Amalgamator": "./dist/src/program/Amalgamator.js",
+    "./MallocHoister": "./dist/src/hoisting/MallocHoister.js",
+    "./CallHoister": "./dist/src/hoisting/CallHoister.js"
   },
   "files": [
     "dist/src"

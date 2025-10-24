@@ -1,4 +1,5 @@
-import { Type } from "@specs-feup/clava/api/Joinpoints.js";
+import { Call, FunctionJp, Type } from "@specs-feup/clava/api/Joinpoints.js";
+import Query from "@specs-feup/lara/api/weaver/Query.js";
 import chalk from "chalk";
 
 export abstract class AdvancedTransform {
@@ -62,5 +63,34 @@ export abstract class AdvancedTransform {
 
     protected logLine(len: number = 65) {
         this.log("-".repeat(len));
+    }
+
+    // -----------------------------------------------------------------------
+    protected getFunctionChain(startingPoint: FunctionJp | undefined): FunctionJp[] {
+        const funs: FunctionJp[] = [];
+
+        if (startingPoint !== undefined) {
+
+            const stack = [startingPoint];
+            const visited = new Set<string>();
+
+            while (stack.length > 0) {
+                const currentFun = stack.pop()!;
+                if (visited.has(currentFun.name)) {
+                    continue;
+                }
+                visited.add(currentFun.name);
+                funs.push(currentFun);
+
+                const calledFuns = Query.searchFrom(currentFun, Call).get()
+                    .map(call => call.function)
+                    .filter(fun => fun != undefined && fun.isImplementation) as FunctionJp[];
+                stack.push(...calledFuns);
+            }
+        }
+        else {
+            funs.push(...Query.search(FunctionJp).get().filter(fun => fun.isImplementation));
+        }
+        return funs;
     }
 }

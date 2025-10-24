@@ -25,16 +25,19 @@ export abstract class AHoister extends AdvancedTransform {
     }
 
     protected verifyHoistConditions(call: Call, targetPoint: FunctionJp): boolean {
-        let parentFun = call.getAncestor("function") as FunctionJp;
-        let canHoist = false;
-        do {
-            if (parentFun.astId === targetPoint.astId) {
-                canHoist = true;
-                break;
+        const funChain = this.getFunctionChain(targetPoint);
+        let inChain = false;
+        for (const func of funChain) {
+            for (const c of Query.searchFrom(func, Call)) {
+                if (c.astId === call.astId) {
+                    inChain = true;
+                    break;
+                }
             }
-        } while (parentFun != null);
-        if (!canHoist) {
-            this.logError(`Cannot hoist call ${call.code} to function ${targetPoint.name} as it is not an ancestor.`);
+        }
+
+        if (!inChain) {
+            this.logWarning(`Cannot hoist call ${call.code} to function ${targetPoint.name} as it is not an ancestor.`);
             return false;
         }
         return true;

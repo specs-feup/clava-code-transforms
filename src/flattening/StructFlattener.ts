@@ -15,7 +15,7 @@ export class StructFlattener extends AdvancedTransform {
     }
 
     public flattenAll(startingPoint?: FunctionJp): string[] {
-        const funs = this.extractFunctionCalls(startingPoint);
+        const funs = this.getFunctionChain(startingPoint);
         const structs = this.findAllStructs();
         this.log(`Found ${structs.length} regular structs`);
 
@@ -51,7 +51,7 @@ export class StructFlattener extends AdvancedTransform {
     }
 
     public flattenByName(name: string, startingPoint?: FunctionJp): void {
-        const funs = this.extractFunctionCalls(startingPoint);
+        const funs = this.getFunctionChain(startingPoint);
         const structs = [
             ...this.findAllStructs(),
             ...this.findAllStructlikeClasses()
@@ -69,39 +69,8 @@ export class StructFlattener extends AdvancedTransform {
 
     public flattenStruct(struct: Struct, startingPoint?: FunctionJp): void {
         const name = this.getStructName(struct);
-        const funs = this.extractFunctionCalls(startingPoint);
+        const funs = this.getFunctionChain(startingPoint);
         this.algorithm.flatten(struct.fields, name, funs);
-    }
-
-    // -----------------------------------------------------------------------
-    protected extractFunctionCalls(startingPoint: FunctionJp | undefined): FunctionJp[] {
-        const funs: FunctionJp[] = [];
-
-        if (startingPoint !== undefined) {
-
-            const stack = [startingPoint];
-            const visited = new Set<string>();
-
-            while (stack.length > 0) {
-                const currentFun = stack.pop()!;
-                if (visited.has(currentFun.name)) {
-                    continue;
-                }
-                visited.add(currentFun.name);
-                funs.push(currentFun);
-
-                const calledFuns = Query.searchFrom(currentFun, Call).get()
-                    .map(call => call.function)
-                    .filter(fun => fun != undefined && fun.isImplementation) as FunctionJp[];
-                stack.push(...calledFuns);
-            }
-            this.log(`Found ${funs.length} functions reachable from ${startingPoint.name}`);
-        }
-        else {
-            funs.push(...Query.search(FunctionJp).get().filter(fun => fun.isImplementation));
-            this.log(`Found ${funs.length} functions in the codebase`);
-        }
-        return funs;
     }
 
     // -----------------------------------------------------------------------
