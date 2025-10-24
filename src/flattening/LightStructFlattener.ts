@@ -31,7 +31,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     // -----------------------------------------------------------------------
     private flattenGlobals(fields: Field[], name: string): number {
         let changes = 0;
-        this.log("----------------------------------------------------------------------");
+        this.logLine();
         this.log(`Flattening struct ${name} in global scope`);
 
         for (const decl of Query.search(Vardecl, (d) => d.type.code.includes(name) && d.isGlobal)) {
@@ -53,7 +53,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     }
 
     private flattenInFunction(fun: FunctionJp, fields: Field[], name: string): number {
-        this.log("----------------------------------------------------------------------");
+        this.logLine();
         this.log(`Flattening struct ${name} in function ${fun.name}`);
         let changes = 0;
         changes += this.flattenParams(fun, fields, name);
@@ -570,12 +570,12 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     }
 
     private buildTopFunctionInterface(name: string, topFunction: FunctionJp, fields: Field[]) {
-        this.log("----------------------------------------------------------------------");
+        this.logLine();
         this.log(`Building struct to flat mapping for struct ${name} before calls to ${topFunction.name}()`);
         for (const call of Query.search(Call, { name: topFunction.name })) {
             this.buildStructToFlatMap(fields, name, call);
         }
-        this.log("----------------------------------------------------------------------");
+        this.logLine();
     }
 
     private buildStructToFlatMap(fields: Field[], structName: string, call: Call): void {

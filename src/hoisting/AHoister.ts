@@ -37,7 +37,7 @@ export abstract class AHoister extends AdvancedTransform {
         }
 
         if (!inChain) {
-            this.logWarning(`Cannot hoist call ${call.code} to function ${targetPoint.name} as it is not an ancestor.`);
+            this.logWarning(`Call ${call.name}() has no ancestor function ${targetPoint.name}()`);
             return false;
         }
         return true;
