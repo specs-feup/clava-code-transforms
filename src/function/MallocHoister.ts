@@ -2,9 +2,10 @@ import { Call, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 
-export class CallHoisting extends AdvancedTransform {
+export class MallocHoister extends CallHoister {
+
     constructor(silent: boolean = false) {
-        super("CallHoisting", silent);
+        super("MallocHoister", silent);
     }
 
     public hoist(call: Call): boolean {
