@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayAccess, ArrayType, BinaryOp, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, ArrayType, BinaryOp, Body, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, Scope, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 import { Voidifier } from "../function/Voidifier.js";
@@ -56,12 +56,17 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         this.logLine();
         this.log(`Flattening struct ${name} in function ${fun.name}`);
         let changes = 0;
-        changes += this.flattenParams(fun, fields, name);
-        changes += this.flattenMemberRefs(fun, fields, name);
-        changes += this.flattenNullComparison(fun, fields, name);
-        changes += this.flattenDecls(fun, fields, name);
-        changes += this.flattenAssignments(fun, fields, name);
+        // references to struct variables (and their members)
         changes += this.flattenCalls(fun, fields, name);
+        changes += this.flattenMemberRefs(fun, fields, name);
+
+        // assignments to struct variables
+        changes += this.flattenNullComparison(fun, fields, name);
+        changes += this.flattenAssignments(fun, fields, name);
+
+        // declarations of struct variables
+        changes += this.flattenParams(fun, fields, name);
+        changes += this.flattenDecls(fun, fields, name);
 
         if (changes > 0) {
             this.log(`Flattened all ${changes} occurrences of struct ${name} in function ${fun.name}`);
@@ -243,24 +248,32 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
     private flattenDecls(fun: FunctionJp, fields: Field[], name: string): number {
         let changes = 0;
-        const toRemove: DeclStmt[] = [];
+        const toRemove: Set<DeclStmt> = new Set();
 
-        Query.searchFrom(fun, Vardecl).get().forEach((decl) => {
-            const type = decl.type;
+        Query.searchFrom(fun, DeclStmt).get().forEach((declStmt) => {
+            const decls = declStmt.decls;
 
-            if (type.code.includes(name)) {
-                const newDecls = this.flattenDecl(decl, fields);
+            for (const decl of decls) {
+                if (!(decl instanceof Vardecl)) {
+                    this.logWarning(`  Could not flatten decl ${decl.code} (not a Vardecl)`);
+                    continue;
+                }
+                const type = decl.type;
 
-                const parent = decl.parent;
-                newDecls.forEach((newDecl) => {
-                    parent.insertBefore(newDecl);
-                });
-                toRemove.push(decl.parent as DeclStmt);
+                if (type.code.includes(name)) {
+                    const newDecls = this.flattenDecl(decl, fields);
 
-                this.log(`  Flattened decl ${decl.name}`);
-                changes++;
+                    newDecls.forEach((newDecl) => {
+                        declStmt.insertBefore(newDecl);
+                    });
+                    toRemove.add(declStmt);
+
+                    this.log(`  Flattened decl ${decl.name}`);
+                    changes++;
+                }
             }
         });
+
         toRemove.forEach((declStmt) => {
             declStmt.detach();
         });

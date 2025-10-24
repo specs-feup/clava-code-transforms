@@ -16,6 +16,8 @@ export class StructFlattener extends AdvancedTransform {
 
     public flattenAll(startingPoint?: FunctionJp): string[] {
         const funs = this.getFunctionChain(startingPoint);
+        console.log(funs.map((f) => f.name).join(", "));
+
         const structs = this.findAllStructs();
         this.log(`Found ${structs.length} regular structs`);
 
@@ -39,13 +41,14 @@ export class StructFlattener extends AdvancedTransform {
             this.algorithm.flatten(struct.fields, name, funs);
             decompNames.push(name);
             this.log(`Done flattening struct ${name}`);
-            try {
-                Clava.rebuild();
-            } catch (e) {
-                this.log(`Rebuild has errors after flattening ${name}`);
-            }
         });
         this.log(`Total flattened structs: ${decompNames.length}`);
+
+        try {
+            Clava.rebuild();
+        } catch (e) {
+            this.logWarning(`Rebuild has errors after flattening`);
+        }
 
         return decompNames;
     }
