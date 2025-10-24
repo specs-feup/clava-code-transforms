@@ -1,29 +1,24 @@
 import { Call, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
+import { AHoister } from "./AHoister.js";
 
-export abstract class CallHoister extends AdvancedTransform {
+export abstract class CallHoister extends AHoister {
     constructor(silent: boolean = false, name: string = "CallHoister") {
-        super(name, silent);
+        super(silent, name);
     }
 
-    public hoistAll(callSignature: string, startingPoint?: FunctionJp): number {
-        if (startingPoint == undefined) {
-            startingPoint = Query.search(FunctionJp, { name: "main" }).first();
-            if (startingPoint == undefined) {
-                this.logError("No starting point provided and 'main' function not found.");
-                return 0;
-            }
-            else {
-                this.log(`Starting point not provided. Using 'main' function as starting point.`);
-            }
+    public hoistAll(callSignature: string, targetPoint?: FunctionJp): number {
+        targetPoint = this.getTargetPoint(targetPoint);
+        if (targetPoint == undefined) {
+            return 0;
         }
 
         let hoistedCount = 0;
         const calls = Query.search(Call, { signature: callSignature }).get();
 
         for (const call of calls) {
-            const hoisted = this.hoist(call, startingPoint);
+            const hoisted = this.hoist(call, targetPoint);
             if (hoisted) {
                 hoistedCount++;
                 this.log(`Successfully hoisted call ${call.code}`);
@@ -34,5 +29,16 @@ export abstract class CallHoister extends AdvancedTransform {
         return hoistedCount;
     }
 
-    public abstract hoist(call: Call, startingPoint: FunctionJp): boolean;
+    public hoistCall(call: Call, targetPoint: FunctionJp): boolean {
+        const canHoist = this.verifyHoistConditions(call, targetPoint);
+        if (!canHoist) {
+            return false;
+        }
+
+        return this.hoist(call, targetPoint);
+    }
+
+    protected hoist(call: Call, targetPoint: FunctionJp): boolean {
+        return true;
+    }
 }
