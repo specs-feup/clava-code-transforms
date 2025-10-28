@@ -1,8 +1,9 @@
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Loop, MemberAccess, Param, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { ArrayAccess, BinaryOp, Call, Expression, ExprStmt, FunctionJp, If, Loop, MemberAccess, Param, ParenExpr, PointerType, ReturnStmt, Statement, Struct, Tag, TagType, Type, TypedefType, UnaryOp, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
+import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
 export class Voidifier extends AdvancedTransform {
     constructor(silent: boolean = false) {
@@ -10,21 +11,21 @@ export class Voidifier extends AdvancedTransform {
     }
 
     public voidify(fun: FunctionJp, returnVarName = "rtr_value"): boolean {
+        if (this.functionIsOperator(fun)) {
+            return false;
+        }
         const calls = Query.search(Call, { "signature": fun.signature }).get();
 
         const returnStmts = this.findNonvoidReturnStmts(fun);
         if (returnStmts.length == 0) {
             return false;
         }
-        if (this.functionIsOperator(fun)) {
-            return false;
-        }
+
         this.makeDefaultParamsExplicit(fun);
 
+        this.voidifyFunction(fun, returnStmts, returnVarName);
+
         const retVarType = fun.returnType;
-
-        this.voidifyFunction(fun, returnStmts, returnVarName, retVarType);
-
         calls.forEach((call) => {
             this.handleCall(call, fun, retVarType);
         });
@@ -221,22 +222,75 @@ export class Voidifier extends AdvancedTransform {
         }
     }
 
-    private voidifyFunction(fun: FunctionJp, returnStmts: ReturnStmt[], returnVarName: string, retVarType: Type): void {
-        const pointerType = ClavaJoinPoints.pointer(retVarType);
-        const retParam = ClavaJoinPoints.param(returnVarName, pointerType);
+    private voidifyFunction(fun: FunctionJp, returnStmts: ReturnStmt[], returnVarName: string): void {
+        const retVarType = fun.returnType;
+        // by default, the new return param will be a pointer to the original return type
+        // special case: we're returning a struct pointer
+        let wrapAsPointer = true;
+
+        if (retVarType instanceof PointerType) {
+            const pointee = retVarType.pointee;
+            if (pointee instanceof TypedefType) {
+                const baseType = pointee.desugarAll;
+                if ((baseType instanceof TagType) && (baseType.decl.code.includes("struct"))) {
+                    // we revert back to a struct pointer
+                    wrapAsPointer = false;
+                }
+            }
+        }
+        const wrappedType = wrapAsPointer ? ClavaJoinPoints.pointer(retVarType) : retVarType;
+        const retParam = ClavaJoinPoints.param(returnVarName, wrappedType);
         fun.addParam(retParam.name, retParam.type);
 
-
         for (const ret of returnStmts) {
-            const derefRet = ClavaJoinPoints.unaryOp("*", retParam.varref());
-            const retVal = ret.children[0] as Expression;   // TS: possibly dangerous, needs to be checked
-            retVal.detach();
-            const op = ClavaJoinPoints.binaryOp("=", derefRet, retVal, retVarType);
-            ret.insertBefore(ClavaJoinPoints.exprStmt(op));
-
+            const retStmts = wrapAsPointer ?
+                [this.handleSimpleReturn(retParam, ret, retVarType)] :
+                this.handleStructReturn(retParam, ret, retVarType);
+            retStmts.forEach((stmt) => {
+                ret.insertBefore(stmt);
+            });
+            ret.replaceWith(ClavaJoinPoints.returnStmt());
         }
         const voidType = ClavaJoinPoints.type("void");
         fun.setReturnType(voidType);
+    }
+
+    private handleSimpleReturn(retParam: Param, ret: ReturnStmt, retVarType: Type): ExprStmt {
+        const retVarref = retParam.varref();
+        const derefRet = ClavaJoinPoints.unaryOp("*", retVarref);
+
+        const retVal = ret.children[0] as Expression; // TS: possibly dangerous, needs to be checked
+        retVal.detach();
+        const op = ClavaJoinPoints.binaryOp("=", derefRet, retVal, retVarType);
+        const opStmt = ClavaJoinPoints.exprStmt(op);
+        return opStmt;
+    }
+
+    private handleStructReturn(retParam: Param, ret: ReturnStmt, retVarType: Type): ExprStmt[] {
+        const returnStmts: ExprStmt[] = [];
+
+        const retVarref = retParam.varref();
+        const structDef = (retVarType.desugarAll as TagType).decl;
+        const struct = Query.searchFromInclusive(structDef, Struct).first()! as Struct;
+        if (!struct) {
+            this.logError("Could not find struct definition for return type");
+            throw new Error("Struct definition not found");
+        }
+        const fields = struct.fields;
+
+        for (const field of fields) {
+            const fieldBaseType = ClavaJoinPoints.type(field.type.code.replace("[", "").replace("]", ""));
+
+            const dest = ClavaJoinPoints.exprLiteral(`${retVarref.code}->${field.name}`, field.type);
+            const src = ClavaJoinPoints.exprLiteral(`${ret.children[0].code}->${field.name}`, field.type);
+            const sizeofOp = ClavaJoinPoints.exprLiteral(`sizeof(${fieldBaseType.code})`);
+            const memcpyArgs = [dest, src, sizeofOp];
+            const memcpy = ClavaJoinPoints.callFromName("memcpy", ClavaJoinPoints.type("void*"), ...memcpyArgs);
+            const memcpyStmt = ClavaJoinPoints.exprStmt(memcpy);
+            returnStmts.push(memcpyStmt);
+
+        }
+        return returnStmts;
     }
 
     private findNonvoidReturnStmts(fun: FunctionJp): ReturnStmt[] {
