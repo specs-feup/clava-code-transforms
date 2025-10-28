@@ -10,7 +10,7 @@ export class Voidifier extends AdvancedTransform {
         super("Voidifier", silent);
     }
 
-    public voidify(fun: FunctionJp, returnVarName = "rtr_value"): boolean {
+    public voidify(fun: FunctionJp, returnVarName = "rtr_value", copyStructs: boolean = false): boolean {
         if (this.functionIsOperator(fun)) {
             return false;
         }
@@ -23,11 +23,11 @@ export class Voidifier extends AdvancedTransform {
 
         this.makeDefaultParamsExplicit(fun);
 
-        this.voidifyFunction(fun, returnStmts, returnVarName);
+        this.voidifyFunction(fun, returnStmts, returnVarName, copyStructs);
 
         const retVarType = fun.returnType;
         calls.forEach((call) => {
-            this.handleCall(call, fun, retVarType);
+            this.handleCall(call, fun, retVarType, copyStructs);
         });
 
         this.log(`Voidified function ${fun.name}`);
@@ -93,10 +93,10 @@ export class Voidifier extends AdvancedTransform {
         return regex.test(fun.name);
     }
 
-    private handleAssignmentCall(call: Call, fun: FunctionJp): void {
+    private handleAssignmentCall(call: Call, fun: FunctionJp, copyStructs: boolean): void {
         const parent = call.parent as BinaryOp; // TS: should be safe, as it was checked before calling this method
         const lvalue = parent.left;
-        const newArg = this.getArgumentFromLhs(lvalue);
+        const newArg = this.getArgumentFromLhs(lvalue, copyStructs);
 
         // the pointer may need to be casted if there are signed/unsigned mismatches
         const newCastedArg = this.applyCasting(newArg, fun);
@@ -105,25 +105,31 @@ export class Voidifier extends AdvancedTransform {
         parent.replaceWith(newCall);
     }
 
-    private getArgumentFromLhs(lhs: Expression): Expression {
+    private getArgumentFromLhs(lhs: Expression, copyStructs: boolean): Expression {
         let newArg: Expression;
 
         if (lhs instanceof Varref) {
             const newRef = ClavaJoinPoints.varRef(lhs.vardecl);
-            newArg = ClavaJoinPoints.unaryOp("&", newRef);
+
+            if (copyStructs && this.isStructPointer(lhs.type)) {
+                newArg = newRef;
+            }
+            else {
+                newArg = ClavaJoinPoints.unaryOp("&", newRef);
+            }
         }
         else if (lhs instanceof ArrayAccess) {
             newArg = ClavaJoinPoints.unaryOp("&", lhs);
         }
         else if (lhs instanceof ParenExpr) {
             const inner = lhs.subExpr;
-            newArg = this.getArgumentFromLhs(inner);
+            newArg = this.getArgumentFromLhs(inner, copyStructs);
         }
         else if (lhs instanceof UnaryOp && lhs.kind == "deref") {
             newArg = lhs.children[0] as Expression;
         }
         else if (lhs instanceof MemberAccess) {
-            newArg = this.getArgumentFromLhs(lhs.children[0] as Expression);
+            newArg = this.getArgumentFromLhs(lhs.children[0] as Expression, copyStructs);
         }
         else {
             console.log(lhs.code);
@@ -205,12 +211,12 @@ export class Voidifier extends AdvancedTransform {
         return parent as Statement;
     }
 
-    private handleCall(call: Call, fun: FunctionJp, retVarType: Type): void {
+    private handleCall(call: Call, fun: FunctionJp, retVarType: Type, copyStructs: boolean): void {
         const parent = call.parent;
 
         // call is in an assignment
         if (parent instanceof BinaryOp && parent.kind == "assign") {
-            this.handleAssignmentCall(call, fun);
+            this.handleAssignmentCall(call, fun, copyStructs);
         }
         // call is isolated (i.e., the return value is ignored. We still need to pass a valid variable to save it, though)
         else if (parent instanceof ExprStmt) {
@@ -222,22 +228,12 @@ export class Voidifier extends AdvancedTransform {
         }
     }
 
-    private voidifyFunction(fun: FunctionJp, returnStmts: ReturnStmt[], returnVarName: string): void {
+    private voidifyFunction(fun: FunctionJp, returnStmts: ReturnStmt[], returnVarName: string, copyStructs: boolean = false): void {
         const retVarType = fun.returnType;
         // by default, the new return param will be a pointer to the original return type
         // special case: we're returning a struct pointer
-        let wrapAsPointer = true;
+        let wrapAsPointer = copyStructs ? !this.isStructPointer(retVarType) : true;
 
-        if (retVarType instanceof PointerType) {
-            const pointee = retVarType.pointee;
-            if (pointee instanceof TypedefType) {
-                const baseType = pointee.desugarAll;
-                if ((baseType instanceof TagType) && (baseType.decl.code.includes("struct"))) {
-                    // we revert back to a struct pointer
-                    wrapAsPointer = false;
-                }
-            }
-        }
         const wrappedType = wrapAsPointer ? ClavaJoinPoints.pointer(retVarType) : retVarType;
         const retParam = ClavaJoinPoints.param(returnVarName, wrappedType);
         fun.addParam(retParam.name, retParam.type);
@@ -253,6 +249,19 @@ export class Voidifier extends AdvancedTransform {
         }
         const voidType = ClavaJoinPoints.type("void");
         fun.setReturnType(voidType);
+    }
+
+    private isStructPointer(retVarType: Type) {
+        if (retVarType instanceof PointerType) {
+            const pointee = retVarType.pointee;
+            if (pointee instanceof TypedefType) {
+                const baseType = pointee.desugarAll;
+                if ((baseType instanceof TagType) && (baseType.decl.code.includes("struct"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private handleSimpleReturn(retParam: Param, ret: ReturnStmt, retVarType: Type): ExprStmt {
