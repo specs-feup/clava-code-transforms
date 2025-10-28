@@ -289,9 +289,10 @@ export class Voidifier extends AdvancedTransform {
 
         for (const field of fields) {
             const fieldBaseType = ClavaJoinPoints.type(field.type.code.replace("[", "").replace("]", ""));
+            const fieldPointerType = ClavaJoinPoints.pointer(field.type);
 
-            const dest = ClavaJoinPoints.exprLiteral(`${retVarref.code}->${field.name}`, field.type);
-            const src = ClavaJoinPoints.exprLiteral(`${ret.children[0].code}->${field.name}`, field.type);
+            const dest = ClavaJoinPoints.exprLiteral(`&${retVarref.code}->${field.name}`, fieldPointerType);
+            const src = ClavaJoinPoints.exprLiteral(`&${ret.children[0].code}->${field.name}`, fieldPointerType);
             const sizeofOp = ClavaJoinPoints.exprLiteral(`sizeof(${fieldBaseType.code})`);
             const memcpyArgs = [dest, src, sizeofOp];
             const memcpy = ClavaJoinPoints.callFromName("memcpy", ClavaJoinPoints.type("void*"), ...memcpyArgs);
