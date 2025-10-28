@@ -15,11 +15,10 @@ export class CallTreeInliner extends AdvancedTransform {
             return false;
         }
 
-        if (!removeInlined) {
+        if (removeInlined) {
             funs.forEach((fun) => {
                 if (this.canRemoveFunction(fun)) {
                     fun.detach();
-                    this.log(`Removed function ${fun.name} after inlining.`);
                 }
             });
             this.log(`Removed ${funs.length} functions after inlining the call tree.`);

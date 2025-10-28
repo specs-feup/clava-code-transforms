@@ -1,4 +1,4 @@
-import { BinaryOp, Call, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, ExprStmt, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { CallHoister } from "./CallHoister.js";
@@ -70,15 +70,35 @@ export class MallocHoister extends AHoister {
             return false;
         }
         const parentFun = call.getAncestor("function") as FunctionJp;
+        if (parentFun.name !== targetPoint.name) {
+            this.logError(`Cannot hoist malloc/calloc call ${call.code} from function ${parentFun.name} to target function ${targetPoint.name}.`);
+            return false;
+        }
+        // build param
         const dummyName = `memregion_${parentFun.name}_${call.line}`;
-
         const lhs = assignment.left;
         const type = lhs.type;
-        const newVarDecl = ClavaJoinPoints.varDeclNoInit(dummyName, type);
-        parentFun.insertBefore(newVarDecl);
+        const newParam = ClavaJoinPoints.param(dummyName, type);
+        parentFun.setParams([...parentFun.params, newParam]);
 
-        const newVarref = newVarDecl.varref();
+        // update malloc assignment to use the param instead
+        const newVarref = newParam.varref();
         assignment.right.replaceWith(newVarref);
+
+        // update every call to parentFun to have the hoisted malloc just before
+        const callsToParent = Query.search(Call, { name: parentFun.name }).get();
+        for (const call of callsToParent) {
+            const callExpr = call.parent as ExprStmt;
+
+            // for now, we just declare the pointer. We'll implement the malloc later
+            const pointerDecl = ClavaJoinPoints.varDeclNoInit(dummyName, type);
+            const declStmt = ClavaJoinPoints.declStmt(pointerDecl)
+            callExpr.insertBefore(declStmt);
+
+            // update call
+            const newArg = ClavaJoinPoints.varRef(dummyName, type);
+            call.addArg(newArg.code, newArg.type);
+        }
 
         return true;
     }
