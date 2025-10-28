@@ -3,7 +3,7 @@ import { AdvancedTransform } from "../AdvancedTransform.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AHoister } from "./AHoister.js";
 
-export abstract class CallHoister extends AHoister {
+export class CallHoister extends AHoister {
     constructor(silent: boolean = false, name: string = "CallHoister") {
         super(silent, name);
     }
@@ -39,6 +39,7 @@ export abstract class CallHoister extends AHoister {
     }
 
     protected hoist(call: Call, targetPoint: FunctionJp): boolean {
+        this.logWarning("Generic call hoisting not implemented.");
         return true;
     }
 }

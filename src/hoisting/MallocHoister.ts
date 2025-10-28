@@ -4,6 +4,7 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { CallHoister } from "./CallHoister.js";
 import { AHoister } from "./AHoister.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
+import Inliner, { InlinerOptions } from "@specs-feup/clava/api/clava/code/Inliner.js";
 
 export class MallocHoister extends AHoister {
 
@@ -16,9 +17,11 @@ export class MallocHoister extends AHoister {
         if (targetPoint == undefined) {
             return 0;
         }
+        this.inlineAll(targetPoint);
 
         const calls = Query.search(Call, (c) => c.name === "malloc" || c.name === "calloc").get();
         let hoistedCount = 0;
+        let nonHoistedCount = 0;
 
         this.logLine();
         for (const call of calls) {
@@ -26,17 +29,24 @@ export class MallocHoister extends AHoister {
             const hoisted = this.hoistMalloc(call, targetPoint);
 
             if (hoisted) {
-                hoistedCount++;
                 this.log(`Successfully hoisted malloc() at function ${parentFun.name}:${call.line}`);
+                this.logLine();
+                hoistedCount++;
             } else {
-                this.log(`Failed to hoist malloc() at function ${parentFun.name}:${call.line}`);
+                nonHoistedCount++;
             }
-            this.logLine();
         }
+        this.log(`MallocHoister Summary:`);
+        this.log(`Total malloc/calloc calls found: ${calls.length}`);
+        this.log(`Successfully hoisted: ${hoistedCount}`);
+        this.log(`Not hoisted: ${nonHoistedCount}`);
+        this.logLine();
         return hoistedCount;
     }
 
     public hoistMalloc(call: Call, targetPoint: FunctionJp): boolean {
+        this.inlineAll(targetPoint);
+
         const canHoist = this.verifyHoistConditions(call, targetPoint);
         if (!canHoist) {
             return false;
@@ -68,5 +78,10 @@ export class MallocHoister extends AHoister {
         assignment.right.replaceWith(newVarref);
 
         return true;
+    }
+
+    private inlineAll(startingPoint: FunctionJp): boolean {
+        const inliner = new Inliner({ prefix: "_i" } as InlinerOptions);
+        return inliner.inlineFunctionTree(startingPoint);
     }
 }
