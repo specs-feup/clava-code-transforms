@@ -35,12 +35,7 @@ export abstract class AHoister extends AdvancedTransform {
                 }
             }
         }
-
-        if (!inChain) {
-            this.logWarning(`Call ${call.name}() has no ancestor function ${targetPoint.name}()`);
-            return false;
-        }
-        return true;
+        return inChain;
     }
 
     protected abstract hoist(call: Call, targetPoint: FunctionJp): boolean;

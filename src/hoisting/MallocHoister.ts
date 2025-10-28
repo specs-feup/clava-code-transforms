@@ -5,6 +5,7 @@ import { CallHoister } from "./CallHoister.js";
 import { AHoister } from "./AHoister.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import Inliner, { InlinerOptions } from "@specs-feup/clava/api/clava/code/Inliner.js";
+import { CallTreeInliner } from "../function/CallTreeInliner.js";
 
 export class MallocHoister extends AHoister {
 
@@ -26,7 +27,7 @@ export class MallocHoister extends AHoister {
         this.logLine();
         for (const call of calls) {
             const parentFun = call.getAncestor("function") as FunctionJp;
-            const hoisted = this.hoistMalloc(call, targetPoint);
+            const hoisted = this.hoistMalloc(call, targetPoint, false);
 
             if (hoisted) {
                 this.log(`Successfully hoisted malloc() at function ${parentFun.name}:${call.line}`);
@@ -44,8 +45,10 @@ export class MallocHoister extends AHoister {
         return hoistedCount;
     }
 
-    public hoistMalloc(call: Call, targetPoint: FunctionJp): boolean {
-        this.inlineAll(targetPoint);
+    public hoistMalloc(call: Call, targetPoint: FunctionJp, inlineTree: boolean = true): boolean {
+        if (inlineTree) {
+            this.inlineAll(targetPoint);
+        }
 
         const canHoist = this.verifyHoistConditions(call, targetPoint);
         if (!canHoist) {
@@ -81,7 +84,7 @@ export class MallocHoister extends AHoister {
     }
 
     private inlineAll(startingPoint: FunctionJp): boolean {
-        const inliner = new Inliner({ prefix: "_i" } as InlinerOptions);
-        return inliner.inlineFunctionTree(startingPoint);
+        const callTreeInliner = new CallTreeInliner();
+        return callTreeInliner.inlineCallTree(startingPoint, true, "_i");
     }
 }
