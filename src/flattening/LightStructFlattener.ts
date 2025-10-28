@@ -200,7 +200,6 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     }
 
     private flattenArrayMemberAccess(ref: Varref, fields: Field[], changes: number): number {
-        console.log(ref);
         const arrayAccess = ref.parent as ArrayAccess;
         const memberAccess = arrayAccess.parent as MemberAccess;
         const indexExprs = arrayAccess.children.splice(1);

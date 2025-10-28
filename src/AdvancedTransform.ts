@@ -1,3 +1,4 @@
+import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { Call, FunctionJp, Type } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import chalk from "chalk";
@@ -65,7 +66,6 @@ export abstract class AdvancedTransform {
         this.log("-".repeat(len));
     }
 
-    // -----------------------------------------------------------------------
     protected getFunctionChain(startingPoint: FunctionJp | undefined): FunctionJp[] {
         const funs: FunctionJp[] = [];
 
@@ -92,5 +92,16 @@ export abstract class AdvancedTransform {
             funs.push(...Query.search(FunctionJp).get().filter(fun => fun.isImplementation));
         }
         return funs;
+    }
+
+    protected rebuildAfterTransform(): boolean {
+        try {
+            Clava.rebuild();
+        } catch (e) {
+            this.logError(`Error rebuilding code after applying ${this.transformName}`);
+            return false;
+        }
+        this.log(`Rebuild successful after applying ${this.transformName}`);
+        return true;
     }
 }

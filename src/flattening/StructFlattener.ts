@@ -3,7 +3,6 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import { LegacyStructFlattener } from "./legacy/LegacyStructFlattener.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
-import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
 export class StructFlattener extends AdvancedTransform {
     private algorithm: StructFlatteningAlgorithm;
@@ -16,7 +15,6 @@ export class StructFlattener extends AdvancedTransform {
 
     public flattenAll(startingPoint?: FunctionJp): string[] {
         const funs = this.getFunctionChain(startingPoint);
-        console.log(funs.map((f) => f.name).join(", "));
 
         const structs = this.findAllStructs();
         this.log(`Found ${structs.length} regular structs`);
@@ -44,16 +42,12 @@ export class StructFlattener extends AdvancedTransform {
         });
         this.log(`Total flattened structs: ${decompNames.length}`);
 
-        try {
-            Clava.rebuild();
-        } catch (e) {
-            this.logWarning(`Rebuild has errors after flattening`);
-        }
+        this.rebuildAfterTransform();
 
         return decompNames;
     }
 
-    public flattenByName(name: string, startingPoint?: FunctionJp): void {
+    public flattenByName(name: string, startingPoint?: FunctionJp): boolean {
         const funs = this.getFunctionChain(startingPoint);
         const structs = [
             ...this.findAllStructs(),
@@ -68,12 +62,15 @@ export class StructFlattener extends AdvancedTransform {
                 this.algorithm.flatten(elemStruct.fields, name, funs);
             }
         });
+        return this.rebuildAfterTransform();
     }
 
-    public flattenStruct(struct: Struct, startingPoint?: FunctionJp): void {
+    public flattenStruct(struct: Struct, startingPoint?: FunctionJp): boolean {
         const name = this.getStructName(struct);
         const funs = this.getFunctionChain(startingPoint);
         this.algorithm.flatten(struct.fields, name, funs);
+
+        return this.rebuildAfterTransform();
     }
 
     // -----------------------------------------------------------------------
