@@ -8,7 +8,7 @@ export class ScopeFlattener extends AdvancedTransform {
         super("ScopeFlattener", silent);
     }
 
-    public flattenScope(scope: Scope, prefix: string): number {
+    public flattenScope(scope: Scope, usePrefix: boolean = true, prefix: string = "_scope"): number {
         let n = 0;
         const innerScopes: Scope[] = [];
         for (const child of scope.children) {
@@ -20,23 +20,25 @@ export class ScopeFlattener extends AdvancedTransform {
             }
         }
         innerScopes.forEach(innerScope => {
-            n += this.flattenScope(innerScope, IdGenerator.next(prefix));
+            n += this.flattenScope(innerScope, usePrefix, IdGenerator.next(prefix));
         });
 
-        const decls: Vardecl[] = [];
-        for (const child of scope.children) {
-            if (child instanceof DeclStmt) {
-                decls.push(...Query.searchFrom(child, Vardecl).get());
+        if (usePrefix) {
+            const decls: Vardecl[] = [];
+            for (const child of scope.children) {
+                if (child instanceof DeclStmt) {
+                    decls.push(...Query.searchFrom(child, Vardecl).get());
+                }
             }
-        }
 
-        for (const decl of decls) {
-            const newName = `${prefix}_${decl.name}`;
+            for (const decl of decls) {
+                const newName = `${prefix}_${decl.name}`;
 
-            for (const ref of Query.searchFrom(scope, Varref, { name: decl.name })) {
-                ref.name = newName
+                for (const ref of Query.searchFrom(scope, Varref, { name: decl.name })) {
+                    ref.name = newName
+                }
+                decl.name = newName;
             }
-            decl.name = newName;
         }
         for (const child of scope.children) {
             scope.insertBefore(child);
@@ -45,7 +47,7 @@ export class ScopeFlattener extends AdvancedTransform {
         return n + 1;
     }
 
-    public flattenAllInFunction(fun: FunctionJp, prefix: string = "_scope"): number {
+    public flattenAllInFunction(fun: FunctionJp, usePrefix: boolean = true, prefix: string = "_scope"): number {
         let n = 0;
         if (fun.body === undefined) {
             return n;
@@ -55,7 +57,7 @@ export class ScopeFlattener extends AdvancedTransform {
 
         for (const scope of allScopes) {
             if (scope.parent !== undefined) {
-                n += this.flattenScope(scope, IdGenerator.next(prefix));
+                n += this.flattenScope(scope, usePrefix, IdGenerator.next(prefix));
             }
         }
         return n;

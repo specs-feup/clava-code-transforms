@@ -236,7 +236,7 @@ export class Outliner extends AdvancedTransform {
         const sf = new ScopeFlattener();
         toFlatten.forEach((scope) => {
             const prefix = IdGenerator.next("_s");
-            sf.flattenScope(scope, prefix);
+            sf.flattenScope(scope, true, prefix);
             this.log(`Flattened scope at line ${scope.line} with prefix "${prefix}"`);
         });
         return toFlatten.length;
