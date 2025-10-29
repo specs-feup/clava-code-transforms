@@ -1,4 +1,4 @@
-import { BinaryOp, Call, ExprStmt, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, Comment, ExprStmt, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { CallHoister } from "./CallHoister.js";
@@ -6,6 +6,7 @@ import { AHoister } from "./AHoister.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import Inliner, { InlinerOptions } from "@specs-feup/clava/api/clava/code/Inliner.js";
 import { CallTreeInliner } from "../function/CallTreeInliner.js";
+import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
 export class MallocHoister extends AHoister {
 
@@ -37,10 +38,14 @@ export class MallocHoister extends AHoister {
                 nonHoistedCount++;
             }
         }
+
+        const removedFrees = this.removeFrees(targetPoint);
+
         this.log(`MallocHoister Summary:`);
         this.log(`Total malloc/calloc calls found: ${calls.length}`);
         this.log(`Successfully hoisted: ${hoistedCount}`);
         this.log(`Not hoisted: ${nonHoistedCount}`);
+        this.log(`Removed free() calls: ${removedFrees}`);
         this.logLine();
         return hoistedCount;
     }
@@ -99,8 +104,17 @@ export class MallocHoister extends AHoister {
             const newArg = ClavaJoinPoints.varRef(dummyName, type);
             call.addArg(newArg.code, newArg.type);
         }
-
         return true;
+    }
+
+    private removeFrees(targetPoint: FunctionJp): number {
+        const frees = Query.searchFrom(targetPoint, Call, (c) => c.name === "free").get();
+        frees.forEach((freeCall) => {
+            const exprStmt = freeCall.getAncestor("exprStmt") as ExprStmt;
+            const comment = ClavaJoinPoints.comment(exprStmt.code);
+            exprStmt.replaceWith(comment);
+        });
+        return frees.length;
     }
 
     private inlineAll(startingPoint: FunctionJp): boolean {
