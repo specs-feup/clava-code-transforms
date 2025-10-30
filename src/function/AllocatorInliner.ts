@@ -1,19 +1,21 @@
-import { BinaryOp, Call, Decl, Expression, ExprStmt, FunctionJp, ReturnStmt, Statement, TagType, Type, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, Decl, Expression, FunctionJp, ReturnStmt, Statement, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
-import Inliner from "@specs-feup/clava/api/clava/code/Inliner.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import NormalizeToSubset from "@specs-feup/clava/api/clava/opt/NormalizeToSubset.js";
+import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
+import { Inliner } from "./Inliner.js";
 
-export class AllocatorInliner extends AdvancedTransform {
+export class AllocatorInliner extends Inliner {
     constructor(silent: boolean = false) {
-        super("AllocatorInliner", silent);
+        super(silent);
+        this.setTransformName("AllocatorInliner");
     }
 
     public findAllAllocatorFunctions(): FunctionJp[] {
 
         const funs = [];
 
-        for (const fun of Query.search(FunctionJp)) {
+        for (const fun of Query.search(FunctionJp, { isImplementation: true })) {
             // Return type must be a struct pointer
             if (!this.isStructPointer(fun.returnType)) {
                 continue;
@@ -44,14 +46,21 @@ export class AllocatorInliner extends AdvancedTransform {
                 this.logWarning(`Failed to inline call to allocator function ${fun.name} at ${call.location}`);
             }
         }
+        if (cnt == calls.length) {
+            this.log(`Successfully inlined all ${cnt} calls to allocator function ${fun.name}`);
+            fun.detach();
+        }
+        else {
+            this.logWarning(`Inlined only ${cnt} out of ${calls.length} calls to allocator function ${fun.name}`);
+        }
         return calls.length;
     }
 
     private getDeclOfAlloc(fun: FunctionJp): Decl | null {
         const allocatorNames = ["malloc", "calloc"];
-        const allocators = Query.searchFrom(fun, Call, (c) => allocatorNames.includes(c.name)).get();
-        if (allocators.length == 1) {
-            const call = allocators[0];
+        const calls = Query.searchFrom(fun, Call).get();
+        if (calls.length == 1 && allocatorNames.includes(calls[0].name)) {
+            const call = calls[0];
 
             // return of allocation must assign to a variable
             const assign = call.getAncestor("binaryOp") as BinaryOp;
@@ -84,7 +93,7 @@ export class AllocatorInliner extends AdvancedTransform {
     }
 
     private inlineCall(call: Call, fun: FunctionJp): boolean {
-        const normalized = this.ensureCallIsNormalized(call);
+        const normalized = this.ensureNormalization(call);
         if (!normalized) {
             return false;
         }
@@ -114,25 +123,9 @@ export class AllocatorInliner extends AdvancedTransform {
         return true;
     }
 
-    private ensureCallIsNormalized(jp: Call | FunctionJp): boolean {
-        const actionPoint = (jp instanceof Call) ? jp.getAncestor("statement") as Statement : jp;
-        try {
-            NormalizeToSubset(actionPoint);
-            return true;
-        } catch (e) {
-            if (jp instanceof Call) {
-                this.logWarning(`Failed to normalize call at ${actionPoint.location}`);
-            }
-            if (jp instanceof FunctionJp) {
-                this.logWarning(`Failed to normalize function ${jp.name}`);
-            }
-            return false;
-        }
-    }
-
     private transformStatements(outerVarref: Varref, call: Call, fun: FunctionJp): Statement[] {
         const transformedStmts: Statement[] = [];
-        const id = `_i${call.line}`;
+        const id = IdGenerator.next("_i");
         const innerDecl = this.getDeclOfAlloc(fun) as Vardecl;
         if (!innerDecl) {
             this.logError(`Could not find declaration assigned to allocator call in function ${fun.name}`);

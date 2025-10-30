@@ -16,6 +16,14 @@ export abstract class AdvancedTransform {
         this.silent = silent;
     }
 
+    public getTransformName(): string {
+        return this.transformName;
+    }
+
+    protected setTransformName(name: string) {
+        this.transformName = name;
+    }
+
     protected simpleType(type: Type, removeSignedInfo: boolean = false): string {
         const baseType = type.code
             .replace("*", "")

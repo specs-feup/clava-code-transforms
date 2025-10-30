@@ -21,6 +21,7 @@
     "test:arrayflat-constprop": "clava dist/test/TestFlatteningConstant.js -- clang inputs/optical-flow/",
     "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
     "test:hoisting-malloc": "clava classic dist/test/TestMallocHoisting.js -p inputs/disparity/ -std c11",
+    "test:inliner": "clava classic dist/test/TestInliner.js -p inputs/disparity/ -std c11",
     "test:loopchar": "clava dist/test/TestLoopCharacterizer.js -- clang inputs/loopchar/",
     "test:outliner": "clava dist/test/TestOutliner.js -- clang inputs/outlining/",
     "test:outliner-edgecases": "clava dist/test/TestOutlinerEdgecases.js -- clang inputs/outlining-edgecases/",
@@ -37,21 +38,23 @@
     "clean": "rm -rf node_modules package-lock.json dist/ woven_code/ output/"
   },
   "exports": {
+    "./AllocatorInliner": "./dist/src/function/AllocatorInliner.js",
+    "./Amalgamator": "./dist/src/program/Amalgamator.js",
+    "./ArrayFlattener": "./dist/src/flattening/ArrayFlattener.js",
+    "./CallHoister": "./dist/src/hoisting/CallHoister.js",
+    "./CallTreeInliner": "./dist/src/function/CallTreeInliner.js",
     "./ConstantFolder": "./dist/src/constfolding/ConstantFolder.js",
     "./ConstantPropagator": "./dist/src/constfolding/ConstantPropagator.js",
     "./FoldingPropagationCombiner": "./dist/src/constfolding/FoldingPropagationCombiner.js",
-    "./ArrayFlattener": "./dist/src/flattening/ArrayFlattener.js",
-    "./StructFlattener": "./dist/src/flattening/StructFlattener.js",
-    "./LightStructFlattener": "./dist/src/flattening/LightStructFlattener.js",
+    "./Inliner": "./dist/src/function/Inliner.js",
     "./LegacyStructDecomposer": "./dist/src/flattening/legacy/LegacyStructDecomposer.js",
-    "./ScopeFlattener": "./dist/src/flattening/ScopeFlattener.js",
-    "./CallTreeInliner": "./dist/src/function/CallTreeInliner.js",
-    "./Outliner": "./dist/src/function/Outliner.js",
-    "./Voidifier": "./dist/src/function/Voidifier.js",
+    "./LightStructFlattener": "./dist/src/flattening/LightStructFlattener.js",
     "./LoopCharacterizer": "./dist/src/loop/LoopCharacterizer.js",
-    "./Amalgamator": "./dist/src/program/Amalgamator.js",
     "./MallocHoister": "./dist/src/hoisting/MallocHoister.js",
-    "./CallHoister": "./dist/src/hoisting/CallHoister.js"
+    "./Outliner": "./dist/src/function/Outliner.js",
+    "./ScopeFlattener": "./dist/src/flattening/ScopeFlattener.js",
+    "./StructFlattener": "./dist/src/flattening/StructFlattener.js",
+    "./Voidifier": "./dist/src/function/Voidifier.js"
   },
   "files": [
     "dist/src"
