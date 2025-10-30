@@ -1,4 +1,4 @@
-import { BinaryOp, Call, Expression, FloatLiteral, FunctionJp, IntLiteral, Literal, ReturnStmt, Statement, Type, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, Expression, FloatLiteral, FunctionJp, IntLiteral, Literal, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import NormalizeToSubset from "@specs-feup/clava/api/clava/opt/NormalizeToSubset.js";
@@ -112,7 +112,10 @@ export class Inliner extends AdvancedTransform {
             for (const varref of Query.searchFrom(stmt, Varref).get()) {
                 if (argToParamMap.has(varref.name)) {
                     const argExpr = argToParamMap.get(varref.name) as Expression;
-                    varref.replaceWith(argExpr.deepCopy());
+                    const newVarref = !(argExpr instanceof Varref) ?
+                        ClavaJoinPoints.parenthesis(argExpr.deepCopy() as Expression) :
+                        argExpr.deepCopy();
+                    varref.replaceWith(newVarref);
                 }
                 else if (varref.isFunctionCall) {
                     continue;
@@ -164,6 +167,24 @@ export class Inliner extends AdvancedTransform {
 
                 const newVarref = newVardecl.varref();
                 op.setFirstChild(newVarref);
+            }
+        }
+        // the classic addr-of operator followed by deref, i.e, *(&var)
+        for (const derefOp of Query.searchFrom(stmt, UnaryOp, { operator: "*" }).get()) {
+            const child = (derefOp.children[0] instanceof ParenExpr) ?
+                derefOp.children[0].children[0] :
+                derefOp.children[0];
+
+            if (child instanceof UnaryOp && child.operator == "&") {
+                const grandChild = child.children[0];
+                derefOp.replaceWith(grandChild);
+            }
+        }
+        // remove single varrefs surrounded by parenthesis
+        for (const parenExpr of Query.searchFrom(stmt, ParenExpr).get()) {
+            const child = parenExpr.children[0];
+            if (child instanceof Varref) {
+                parenExpr.replaceWith(child);
             }
         }
     }
