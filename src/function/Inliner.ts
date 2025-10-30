@@ -1,4 +1,4 @@
-import { Call, Expression, FunctionJp, ReturnStmt, Statement, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, Expression, FloatLiteral, FunctionJp, IntLiteral, Literal, ReturnStmt, Statement, Type, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import NormalizeToSubset from "@specs-feup/clava/api/clava/opt/NormalizeToSubset.js";
@@ -12,7 +12,6 @@ export class Inliner extends AdvancedTransform {
 
     public inline(call: Call, prefix: string = "_i"): boolean {
         if (!this.canInline(call)) {
-            this.logError(`Call to function ${call.function.name} is not inlinable.`);
             return false;
         }
         this.log(`Inlining call to function ${call.function.name}.`);
@@ -44,15 +43,34 @@ export class Inliner extends AdvancedTransform {
         callStmt.detach();
         clone.detach();
 
+        for (const stmt of transStmts) {
+            this.santitizeStatement(stmt);
+        }
+        this.rebuildAfterTransform();
+
         this.log(`Successfully inlined function ${fun.name}.`);
         return true;
     }
 
     public canInline(call: Call): boolean {
+        if (call == null) {
+            this.logError("Call joinpoint is null.");
+            return false;
+        }
+        if (!(call.function instanceof FunctionJp)) {
+            this.logError(`Call at ${call.location} has no associated function implementation.`);
+            return false;
+        }
         const retType = call.function.returnType;
         const isVoidReturn = retType.code.includes("void");
         const isImpl = call.function.isImplementation;
 
+        if (!isImpl) {
+            this.logError(`Function ${call.function.name} called at ${call.location} has no implementation.`);
+        }
+        if (!isVoidReturn) {
+            this.logError(`Function ${call.function.name} called at ${call.location} is not void`);
+        }
         return isVoidReturn && isImpl;
     }
 
@@ -125,5 +143,23 @@ export class Inliner extends AdvancedTransform {
             transformedStmts.push(labelStmt);
         }
         return transformedStmts;
+    }
+
+    private santitizeStatement(stmt: Statement): void {
+        // param turned into literal because arg was literal
+        // may result in things like &123 in funtion calls
+        for (const op of Query.searchFrom(stmt, UnaryOp, { operator: "&" }).get()) {
+            const child = op.children[0];
+            if (child instanceof Literal) {
+                const parentStmt = op.getAncestor("statement") as Statement;
+                const newVarName = IdGenerator.next("_lit");
+
+                const newVardecl = ClavaJoinPoints.varDecl(newVarName, child.copy());
+                parentStmt.insertBefore(newVardecl);
+
+                const newVarref = newVardecl.varref();
+                op.setFirstChild(newVarref);
+            }
+        }
     }
 }
