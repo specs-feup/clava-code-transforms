@@ -1,8 +1,9 @@
-import { Call, FunctionJp, Statement } from "@specs-feup/clava/api/Joinpoints.js";
+import { Call, Expression, FunctionJp, ReturnStmt, Statement, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import NormalizeToSubset from "@specs-feup/clava/api/clava/opt/NormalizeToSubset.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
+import Query from "@specs-feup/lara/api/weaver/Query.js";
 
 export class Inliner extends AdvancedTransform {
     constructor(silent: boolean = false) {
@@ -25,20 +26,23 @@ export class Inliner extends AdvancedTransform {
             return false;
         }
 
-        const stmts = clone.body.stmts;
-        const transStmts = this.transformStatements(stmts, call, id);
+        const transStmts = this.transformStatements(clone, call, id);
 
-        const inlineBegin = ClavaJoinPoints.comment(`${fun.name}(): begin inline`);
-        const inlineEnd = ClavaJoinPoints.comment(`${fun.name}(): end inline`);
+        const inlineBegin = ClavaJoinPoints.stmtLiteral(`//${fun.name}(): begin inline`);
+        const inlineEnd = ClavaJoinPoints.stmtLiteral(`//${fun.name}(): end inline`);
 
         const callStmt = call.getAncestor("statement") as Statement;
-        callStmt.insertBefore(inlineBegin);
-        transStmts.forEach((stmt) => {
-            callStmt.insertBefore(stmt);
-        });
-        callStmt.insertBefore(inlineEnd);
+
+        // bizarre insertion order, because the begin/end comments weren't being processed correctly
+        // when we do this in the sane way (i.e., callStmt.insertBefore)
+        callStmt.insertAfter(inlineBegin);
+        inlineBegin.insertAfter(inlineEnd);
+        for (const stmt of transStmts.reverse()) {
+            inlineBegin.insertAfter(stmt);
+        }
 
         callStmt.detach();
+        clone.detach();
 
         this.log(`Successfully inlined function ${fun.name}.`);
         return true;
@@ -55,7 +59,7 @@ export class Inliner extends AdvancedTransform {
     protected ensureNormalization(jp: Call | FunctionJp): boolean {
         const actionPoint = (jp instanceof Call) ? jp.getAncestor("statement") as Statement : jp;
         try {
-            NormalizeToSubset(actionPoint);
+            NormalizeToSubset(actionPoint, { simplifyLoops: { forToWhile: false } });
             return true;
         } catch (e) {
             if (jp instanceof Call) {
@@ -68,10 +72,58 @@ export class Inliner extends AdvancedTransform {
         }
     }
 
-    protected transformStatements(stmts: Statement[], call: Call, id: string): Statement[] {
+    protected transformStatements(fun: FunctionJp, call: Call, id: string): Statement[] {
         const transformedStmts: Statement[] = [];
 
+        const argToParamMap = new Map<string, Expression>();
+        for (let i = 0; i < call.args.length; i++) {
+            const arg = call.args[i];
+            const param = fun.params[i];
+            argToParamMap.set(param.name, arg);
+        }
 
+        let useEndLabel = false;
+        const endLabel = ClavaJoinPoints.labelDecl(`end_inline${id}`);
+
+        const stmts = fun.body.stmts;
+        for (const stmt of stmts) {
+            // ignore top-level return statements
+            if (stmt instanceof ReturnStmt) {
+                continue;
+            }
+            // change varrefs under stmt tree to either arg expressions or renamed variables
+            for (const varref of Query.searchFrom(stmt, Varref).get()) {
+                if (argToParamMap.has(varref.name)) {
+                    const argExpr = argToParamMap.get(varref.name) as Expression;
+                    varref.replaceWith(argExpr.deepCopy());
+                }
+                else if (varref.isFunctionCall) {
+                    continue;
+                }
+                else {
+                    const newName = `${varref.name}${id}`;
+                    varref.setName(newName);
+                }
+            }
+            // rename all vardecls under stmt tree
+            for (const vardecl of Query.searchFrom(stmt, Vardecl).get()) {
+                const newName = `${vardecl.name}${id}`;
+                vardecl.setName(newName);
+            }
+            // replace non-top level return statements with goto end label
+            for (const retStmt of Query.searchFrom(stmt, ReturnStmt).get()) {
+                ClavaJoinPoints.gotoStmt(endLabel)
+                retStmt.replaceWith(endLabel);
+                useEndLabel = true;
+            }
+            transformedStmts.push(stmt);
+            stmt.detach();
+        }
+
+        if (useEndLabel) {
+            const labelStmt = ClavaJoinPoints.labelStmt(endLabel);
+            transformedStmts.push(labelStmt);
+        }
         return transformedStmts;
     }
 }

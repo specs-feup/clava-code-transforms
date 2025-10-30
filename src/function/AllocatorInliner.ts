@@ -113,7 +113,7 @@ export class AllocatorInliner extends Inliner {
         const cloneName = `${fun.name}_${lineNo}`;
         const clone = fun.clone(cloneName);
 
-        const stmts = this.transformStatements(outerVarref, call, clone);
+        const stmts = this.transformStatementsWithReturn(outerVarref, call, clone);
         for (const stmt of stmts) {
             parentStmt.insertBefore(stmt);
         }
@@ -123,7 +123,7 @@ export class AllocatorInliner extends Inliner {
         return true;
     }
 
-    private transformStatements(outerVarref: Varref, call: Call, fun: FunctionJp): Statement[] {
+    private transformStatementsWithReturn(outerVarref: Varref, call: Call, fun: FunctionJp): Statement[] {
         const transformedStmts: Statement[] = [];
         const id = IdGenerator.next("_i");
         const innerDecl = this.getDeclOfAlloc(fun) as Vardecl;
