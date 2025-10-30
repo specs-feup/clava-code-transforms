@@ -1,5 +1,5 @@
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
-import { Call, FunctionJp, Type } from "@specs-feup/clava/api/Joinpoints.js";
+import { Call, FunctionJp, PointerType, TagType, Type, TypedefType } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import chalk from "chalk";
 
@@ -103,5 +103,18 @@ export abstract class AdvancedTransform {
         }
         this.log(`Rebuild successful after applying ${this.transformName}`);
         return true;
+    }
+
+    protected isStructPointer(retVarType: Type) {
+        if (retVarType instanceof PointerType) {
+            const pointee = retVarType.pointee;
+            if (pointee instanceof TypedefType) {
+                const baseType = pointee.desugarAll;
+                if ((baseType instanceof TagType) && (baseType.decl.code.includes("struct"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
