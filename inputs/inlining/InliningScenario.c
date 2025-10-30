@@ -11,6 +11,9 @@ F2D *fMallocHandle(int rows, int cols)
     out = (F2D *)malloc(sizeof(F2D) + sizeof(float) * rows * cols);
     out->height = rows;
     out->width = cols;
+    int x;
+    x = 0; // Dummy line to illustrate more code can be here
+    int y = 1;
     return out;
 }
 
