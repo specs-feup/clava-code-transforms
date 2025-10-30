@@ -1,12 +1,8 @@
-import { BinaryOp, Call, Comment, ExprStmt, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
-import { AdvancedTransform } from "../AdvancedTransform.js";
+import { BinaryOp, Call, ExprStmt, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import { CallHoister } from "./CallHoister.js";
 import { AHoister } from "./AHoister.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import Inliner, { InlinerOptions } from "@specs-feup/clava/api/clava/code/Inliner.js";
 import { CallTreeInliner } from "../function/CallTreeInliner.js";
-import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
 export class MallocHoister extends AHoister {
 
@@ -15,11 +11,20 @@ export class MallocHoister extends AHoister {
     }
 
     public hoistAllMallocs(targetPoint?: FunctionJp): number {
-        targetPoint = this.getTargetPoint(targetPoint);
-        if (targetPoint == undefined) {
+        let actualPoint = this.getTargetPoint(targetPoint);
+        if (actualPoint == undefined) {
+            this.logError("No valid target point found for malloc hoisting.");
             return 0;
         }
-        this.inlineAll(targetPoint);
+        const actualPointName = actualPoint.name;
+        this.inlineAll(actualPoint);
+
+        // inlineAll rebuilds the AST, so we need to get the target point again
+        actualPoint = this.getTargetPoint(actualPointName);
+        if (actualPoint == undefined) {
+            this.logError("No valid target point found for malloc hoisting after inlining.");
+            return 0;
+        }
 
         const calls = Query.search(Call, (c) => c.name === "malloc" || c.name === "calloc").get();
         let hoistedCount = 0;
@@ -28,7 +33,7 @@ export class MallocHoister extends AHoister {
         this.logLine();
         for (const call of calls) {
             const parentFun = call.getAncestor("function") as FunctionJp;
-            const hoisted = this.hoistMalloc(call, targetPoint, false);
+            const hoisted = this.hoistMalloc(call, actualPoint, false);
 
             if (hoisted) {
                 this.log(`Successfully hoisted malloc() at function ${parentFun.name}:${call.line}`);
@@ -39,7 +44,7 @@ export class MallocHoister extends AHoister {
             }
         }
 
-        const removedFrees = this.removeFrees(targetPoint);
+        const removedFrees = this.removeFrees(actualPoint);
 
         this.log(`MallocHoister Summary:`);
         this.log(`Total malloc/calloc calls found: ${calls.length}`);
