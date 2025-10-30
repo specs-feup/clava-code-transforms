@@ -16,6 +16,10 @@ export abstract class AdvancedTransform {
         this.silent = silent;
     }
 
+    public isSilent(): boolean {
+        return this.silent;
+    }
+
     public getTransformName(): string {
         return this.transformName;
     }

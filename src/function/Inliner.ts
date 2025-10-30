@@ -41,12 +41,11 @@ export class Inliner extends AdvancedTransform {
         }
 
         callStmt.detach();
-        clone.detach();
+        this.detachClonedFunction(clone);
 
         for (const stmt of transStmts) {
             this.santitizeStatement(stmt);
         }
-        this.rebuildAfterTransform();
 
         this.log(`Successfully inlined function ${fun.name}.`);
         return true;
@@ -143,6 +142,12 @@ export class Inliner extends AdvancedTransform {
             transformedStmts.push(labelStmt);
         }
         return transformedStmts;
+    }
+
+    protected detachClonedFunction(fun: FunctionJp): void {
+        for (const f of Query.search(FunctionJp, { name: fun.name }).get()) {
+            f.detach();
+        }
     }
 
     private santitizeStatement(stmt: Statement): void {

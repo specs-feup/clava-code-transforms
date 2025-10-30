@@ -19,6 +19,7 @@
     "test:amalgamation-typedefs": "clava classic dist/test/TestAmalgamatorTypedefs.js -p inputs/mser/ -ncg -std c11 -cr -cfs -pi",
     "test:arrayflat": "clava dist/test/TestArrayFlattener.js -- clang inputs/arrayflat/",
     "test:arrayflat-constprop": "clava dist/test/TestFlatteningConstant.js -- clang inputs/optical-flow/",
+    "test:call-tree-inliner": "clava classic dist/test/TestCallTreeInliner.js -p inputs/disparity/ -std c11",
     "test:constprop": "clava dist/test/TestConstantPropagator.js -- clang inputs/constprop/",
     "test:hoisting-malloc": "clava classic dist/test/TestMallocHoisting.js -p inputs/disparity/ -std c11",
     "test:inliner": "clava classic dist/test/TestInliner.js -p inputs/disparity/ -std c11",
