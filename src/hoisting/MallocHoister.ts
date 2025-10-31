@@ -3,6 +3,7 @@ import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AHoister } from "./AHoister.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
 import { CallTreeInliner } from "../function/CallTreeInliner.js";
+import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 
 export class MallocHoister extends AHoister {
 
@@ -85,7 +86,9 @@ export class MallocHoister extends AHoister {
             return false;
         }
         // build param
-        const dummyName = `memregion_${parentFun.name}_${call.line}`;
+        const id = IdGenerator.next("memregion_");
+        const size = this.getSizeEstimate(call);
+        const dummyName = `${id}_size${size}`;
         const lhs = assignment.left;
         const type = lhs.type;
         const newParam = ClavaJoinPoints.param(dummyName, type);
@@ -110,6 +113,10 @@ export class MallocHoister extends AHoister {
             call.addArg(newArg.code, newArg.type);
         }
         return true;
+    }
+
+    private getSizeEstimate(call: Call): string {
+        return "N";
     }
 
     private removeFrees(targetPoint: FunctionJp): number {
