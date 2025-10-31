@@ -117,7 +117,7 @@ export class Inliner extends AdvancedTransform {
                         argExpr.deepCopy();
                     varref.replaceWith(newVarref);
                 }
-                else if (varref.isFunctionCall) {
+                else if (varref.isFunctionCall || (varref.decl as Vardecl).isGlobal) {
                     continue;
                 }
                 else {
