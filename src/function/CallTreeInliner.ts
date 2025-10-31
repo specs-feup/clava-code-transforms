@@ -1,4 +1,4 @@
-import { Call, ExprStmt, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
+import { Call, ExprStmt, FunctionJp, Statement } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { Inliner } from "./Inliner.js";
@@ -41,12 +41,31 @@ export class CallTreeInliner extends AdvancedTransform {
         this.log(`Inlined a total of ${totalInlined} function calls in the call tree of function ${topLevelFunction.name}.`);
 
         if (removeInlined) {
-            for (const fun of inlinedFuns) {
-                fun.detach();
-            }
-            this.log(`Removed ${inlinedFuns.size} inlined function implementations.`);
+            this.removeInlinedFunctions(inlinedFuns);
         }
         this.rebuildAfterTransform();
+
+        this.sanitizeInlinedRegion(topLevelFunction);
+
+
         return true;
+    }
+
+    private removeInlinedFunctions(inlinedFuns: Set<FunctionJp>): void {
+        for (const fun of inlinedFuns) {
+            fun.detach();
+        }
+        this.log(`Removed ${inlinedFuns.size} inlined function implementations.`);
+    }
+
+    private sanitizeInlinedRegion(fun: FunctionJp): void {
+        const stmts = Query.searchFrom(fun, Statement).get();
+        const inliner = new Inliner(true);
+
+        for (const stmt of stmts) {
+            inliner.santitizeStatement(stmt);
+        }
+
+        this.log(`Sanitized inlined regions in function ${fun.name}.`);
     }
 }

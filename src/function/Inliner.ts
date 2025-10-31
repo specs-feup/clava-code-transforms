@@ -153,7 +153,7 @@ export class Inliner extends AdvancedTransform {
         }
     }
 
-    private santitizeStatement(stmt: Statement): void {
+    public santitizeStatement(stmt: Statement): void {
         // param turned into literal because arg was literal
         // may result in things like &123 in funtion calls
         for (const op of Query.searchFrom(stmt, UnaryOp, { operator: "&" }).get()) {
@@ -180,11 +180,21 @@ export class Inliner extends AdvancedTransform {
                 derefOp.replaceWith(grandChild);
             }
         }
-        // remove single varrefs surrounded by parenthesis
-        for (const parenExpr of Query.searchFrom(stmt, ParenExpr).get()) {
-            const child = parenExpr.children[0];
-            if (child instanceof Varref) {
-                parenExpr.replaceWith(child);
+        // remove redundant parenthesis
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (const parenExpr of Query.searchFromInclusive(stmt, ParenExpr, (p) => !(p.parent instanceof ParenExpr) && p.children.length == 1).get()) {
+
+                const child = parenExpr.children[0];
+                if ((child instanceof Varref) || (child instanceof Literal)) {
+                    parenExpr.replaceWith(child);
+                    changed = true;
+                }
+                if (child instanceof ParenExpr) {
+                    parenExpr.replaceWith(child);
+                    changed = true;
+                }
             }
         }
     }
