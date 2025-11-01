@@ -132,8 +132,8 @@ export class Inliner extends AdvancedTransform {
             }
             // replace non-top level return statements with goto end label
             for (const retStmt of Query.searchFrom(stmt, ReturnStmt).get()) {
-                ClavaJoinPoints.gotoStmt(endLabel)
-                retStmt.replaceWith(endLabel);
+                const gotoStmt = ClavaJoinPoints.gotoStmt(endLabel)
+                retStmt.replaceWith(gotoStmt);
                 useEndLabel = true;
             }
             transformedStmts.push(stmt);
@@ -141,8 +141,10 @@ export class Inliner extends AdvancedTransform {
         }
 
         if (useEndLabel) {
-            const labelStmt = ClavaJoinPoints.labelStmt(endLabel);
-            transformedStmts.push(labelStmt);
+            const endLabelStmt = ClavaJoinPoints.labelStmt(endLabel);
+            const emptyStmt = ClavaJoinPoints.stmtLiteral(";");
+            transformedStmts.push(endLabelStmt);
+            transformedStmts.push(emptyStmt); // to make code compliant pre-C23
         }
         return transformedStmts;
     }

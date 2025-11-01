@@ -111,6 +111,7 @@ export abstract class AdvancedTransform {
             Clava.rebuild();
         } catch (e) {
             this.logError(`Error rebuilding code after applying ${this.transformName}`);
+            console.log(e);
             return false;
         }
         this.log(`Rebuild successful after applying ${this.transformName}`);

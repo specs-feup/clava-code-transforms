@@ -43,12 +43,8 @@ export class CallTreeInliner extends AdvancedTransform {
         if (removeInlined) {
             this.removeInlinedFunctions(inlinedFuns);
         }
-        this.rebuildAfterTransform();
-
         this.sanitizeInlinedRegion(topLevelFunction);
-
-
-        return true;
+        return this.rebuildAfterTransform();
     }
 
     private removeInlinedFunctions(inlinedFuns: Set<FunctionJp>): void {
