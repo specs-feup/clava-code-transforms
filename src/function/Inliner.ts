@@ -1,4 +1,4 @@
-import { BinaryOp, Call, Expression, FloatLiteral, FunctionJp, IntLiteral, Literal, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Vardecl, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, DeclStmt, Expression, FloatLiteral, FunctionJp, IntLiteral, Literal, Param, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import NormalizeToSubset from "@specs-feup/clava/api/clava/opt/NormalizeToSubset.js";
@@ -89,6 +89,19 @@ export class Inliner extends AdvancedTransform {
         }
     }
 
+    private isNeverReassigned(param: Param, fun: FunctionJp): boolean {
+        for (const varref of Query.searchFrom(fun.body, Varref, { name: param.name }).get()) {
+            const binaryOp = varref.getAncestor("binaryOp") as BinaryOp;
+            if (binaryOp == null || binaryOp.operator != "=") {
+                continue;
+            }
+            if (binaryOp.left.code == param.name) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     protected transformStatements(fun: FunctionJp, call: Call, id: string): Statement[] {
         const transformedStmts: Statement[] = [];
 
@@ -96,7 +109,19 @@ export class Inliner extends AdvancedTransform {
         for (let i = 0; i < call.args.length; i++) {
             const arg = call.args[i];
             const param = fun.params[i];
-            argToParamMap.set(param.name, arg);
+
+            if (this.isNeverReassigned(param, fun)) {
+                argToParamMap.set(param.name, arg);
+            }
+            else {
+                const newVarName = `${param.name}_local_${id}`;
+                const newVardecl = ClavaJoinPoints.varDecl(newVarName, arg.copy());
+                const declStmt = ClavaJoinPoints.declStmt(newVardecl);
+                transformedStmts.push(declStmt);
+                const newVarref = newVardecl.varref();
+                argToParamMap.set(param.name, newVarref);
+                this.log(` Param ${param.name} is reassigned in ${fun.name}; created local copy ${newVarName}.`);
+            }
         }
 
         let useEndLabel = false;
@@ -109,7 +134,8 @@ export class Inliner extends AdvancedTransform {
                 continue;
             }
             // change varrefs under stmt tree to either arg expressions or renamed variables
-            for (const varref of Query.searchFrom(stmt, Varref).get()) {
+            const varrefs = [...Query.searchFrom(stmt, Varref).get(), ...this.getVarrefsInInit(fun, stmt)]
+            for (const varref of varrefs) {
                 if (argToParamMap.has(varref.name)) {
                     const argExpr = argToParamMap.get(varref.name) as Expression;
                     const newVarref = !(argExpr instanceof Varref) ?
@@ -149,6 +175,17 @@ export class Inliner extends AdvancedTransform {
         return transformedStmts;
     }
 
+    private getVarrefsInInit(fun: FunctionJp, stmt: Statement): Varref[] {
+        const varrefs: Varref[] = [];
+        for (const vardecl of Query.searchFrom(stmt, Vardecl).get()) {
+            if (vardecl.type instanceof VariableArrayType) {
+                const sizeVarrefs = Query.searchFromInclusive(vardecl.type.sizeExpr!, Varref).get();
+                varrefs.push(...sizeVarrefs);
+            }
+        }
+        return varrefs;
+    }
+
     protected detachClonedFunction(fun: FunctionJp): void {
         for (const f of Query.search(FunctionJp, { name: fun.name }).get()) {
             f.detach();
@@ -156,36 +193,10 @@ export class Inliner extends AdvancedTransform {
     }
 
     public santitizeStatement(stmt: Statement): void {
-        // param turned into literal because arg was literal
-        // may result in things like &123 in funtion calls
-        for (const op of Query.searchFrom(stmt, UnaryOp, { operator: "&" }).get()) {
-            const child = op.children[0];
-            if (child instanceof Literal) {
-                const parentStmt = op.getAncestor("statement") as Statement;
-                const newVarName = IdGenerator.next("_lit");
-
-                const newVardecl = ClavaJoinPoints.varDecl(newVarName, child.copy());
-                parentStmt.insertBefore(newVardecl);
-
-                const newVarref = newVardecl.varref();
-                op.setFirstChild(newVarref);
-            }
-        }
-        // the classic addr-of operator followed by deref, i.e, *(&var)
-        for (const derefOp of Query.searchFrom(stmt, UnaryOp, { operator: "*" }).get()) {
-            const child = (derefOp.children[0] instanceof ParenExpr) ?
-                derefOp.children[0].children[0] :
-                derefOp.children[0];
-
-            if (child instanceof UnaryOp && child.operator == "&") {
-                const grandChild = child.children[0];
-                derefOp.replaceWith(grandChild);
-            }
-        }
-        // remove redundant parenthesis
         let changed = true;
         while (changed) {
             changed = false;
+            // remove redundant parenthesis
             for (const parenExpr of Query.searchFromInclusive(stmt, ParenExpr, (p) => !(p.parent instanceof ParenExpr) && p.children.length == 1).get()) {
 
                 const child = parenExpr.children[0];
@@ -195,6 +206,41 @@ export class Inliner extends AdvancedTransform {
                 }
                 if (child instanceof ParenExpr) {
                     parenExpr.replaceWith(child);
+                    changed = true;
+                }
+            }
+            for (const lit of Query.searchFrom(stmt, Literal).get()) {
+                if (lit.parent instanceof ParenExpr) {
+                    const parenExpr = lit.parent as ParenExpr;
+                    parenExpr.replaceWith(lit);
+                    changed = true;
+                }
+            }
+            // param turned into literal because arg was literal
+            // may result in things like &123 in function calls
+            for (const op of Query.searchFrom(stmt, UnaryOp, { operator: "&" }).get()) {
+                const child = op.children[0];
+                if (child instanceof Literal) {
+                    const parentStmt = op.getAncestor("statement") as Statement;
+                    const newVarName = IdGenerator.next("_lit");
+
+                    const newVardecl = ClavaJoinPoints.varDecl(newVarName, child.copy());
+                    parentStmt.insertBefore(newVardecl);
+
+                    const newVarref = newVardecl.varref();
+                    op.setFirstChild(newVarref);
+                    changed = true;
+                }
+            }
+            // the classic addr-of operator followed by deref, i.e, *(&var)
+            for (const derefOp of Query.searchFrom(stmt, UnaryOp, { operator: "*" }).get()) {
+                const child = (derefOp.children[0] instanceof ParenExpr) ?
+                    derefOp.children[0].children[0] :
+                    derefOp.children[0];
+
+                if (child instanceof UnaryOp && child.operator == "&") {
+                    const grandChild = child.children[0];
+                    derefOp.replaceWith(grandChild);
                     changed = true;
                 }
             }
