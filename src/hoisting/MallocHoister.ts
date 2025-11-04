@@ -1,4 +1,4 @@
-import { BinaryOp, Call, ExprStmt, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, ExprStmt, FileJp, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AHoister } from "./AHoister.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
@@ -41,11 +41,13 @@ export class MallocHoister extends AHoister {
                 this.logLine();
                 hoistedCount++;
             } else {
+                this.log(`Could not hoist malloc() at function ${parentFun.name}:${call.line}`);
+                this.logLine();
                 nonHoistedCount++;
             }
         }
-
         const removedFrees = this.removeFrees(actualPoint);
+        this.removeRedundantFunctionDecls(actualPoint);
 
         this.log(`MallocHoister Summary:`);
         this.log(`Total malloc/calloc calls found: ${calls.length}`);
@@ -114,6 +116,25 @@ export class MallocHoister extends AHoister {
         }
         return true;
     }
+
+    private removeRedundantFunctionDecls(targetFun: FunctionJp): void {
+        const allFuns = Query.search(FunctionJp, (f) => f.name === targetFun.name).get();
+        allFuns.forEach((fun) => {
+            if (!fun.isImplementation) {
+                fun.detach();
+                this.log(`Removed old declaration of ${fun.name}() at ${fun.filename}:${fun.line}.`);
+            }
+        });
+
+        const newDecl = ClavaJoinPoints.stmtLiteral(`${targetFun.getDeclaration(true)};`);
+        const file = targetFun.getAncestor("file") as FileJp;
+        const firstFun = Query.searchFrom(file, FunctionJp).first();
+        if (firstFun) {
+            firstFun.insertBefore(newDecl);
+            this.log(`Inserted new declaration of ${targetFun.name}() at ${file.filename}.`);
+        }
+    }
+
 
     private getSizeEstimate(call: Call): string {
         return "N";
