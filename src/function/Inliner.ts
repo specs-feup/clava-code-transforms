@@ -76,6 +76,11 @@ export class Inliner extends AdvancedTransform {
     protected ensureNormalization(jp: Call | FunctionJp): boolean {
         const actionPoint = (jp instanceof Call) ? jp.getAncestor("statement") as Statement : jp;
         try {
+            if (jp instanceof FunctionJp) {
+                // NormalizeToSubset creates decomp_0, decomp_1,... variables regardless of whether they already exist
+                // so we need to rename them first to avoid conflicts
+                this.renameDecompVars(jp);
+            }
             NormalizeToSubset(actionPoint, { simplifyLoops: { forToWhile: false } });
             return true;
         } catch (e) {
@@ -86,6 +91,25 @@ export class Inliner extends AdvancedTransform {
                 this.logWarning(`Failed to normalize function ${jp.name}`);
             }
             return false;
+        }
+    }
+
+    private renameDecompVars(fun: FunctionJp): void {
+        const varsToRename: Vardecl[] = [];
+        for (const vardecl of Query.searchFrom(fun, Vardecl).get()) {
+            const split = vardecl.name.split("_");
+            if (split.length == 2 && split[0] == "decomp" && !isNaN(Number(split[1]))) {
+                varsToRename.push(vardecl);
+            }
+        }
+        for (const vardecl of varsToRename) {
+            const baseName = `${vardecl.name}_renamed_`;
+            const newName = IdGenerator.next(baseName);
+
+            for (const varref of Query.searchFrom(fun, Varref, { name: vardecl.name }).get()) {
+                varref.setName(newName);
+            }
+            vardecl.setName(newName);
         }
     }
 
