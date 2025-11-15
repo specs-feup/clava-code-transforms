@@ -221,21 +221,6 @@ export class Outliner extends AdvancedTransform {
         });
     }
 
-    private flattenScopes(region: Statement[]): number {
-        const toFlatten: Scope[] = [];
-        for (const stmt of region) {
-            toFlatten.push(...Query.searchFromInclusive(stmt, Scope).get().filter((s) => s.joinPointType !== "body"));
-        }
-
-        const sf = new ScopeFlattener();
-        toFlatten.forEach((scope) => {
-            const prefix = IdGenerator.next("_s");
-            sf.flattenScope(scope, true, prefix);
-            this.log(`Flattened scope at line ${scope.line} with prefix "${prefix}"`);
-        });
-        return toFlatten.length;
-    }
-
     // fixes some edge cases where we may end up with top-level code like
     // if(__prematureExit0 == 1) { break; }
     private cleanupBreaks(fun: FunctionJp): void {
@@ -610,7 +595,7 @@ export class Outliner extends AdvancedTransform {
         }
 
         // make sure scalar refs are now dereferenced pointers to params
-        this.scalarsToPointers(region, params, varrefs);
+        this.scalarsToPointers(params, varrefs);
         return fun;
     }
 
@@ -626,30 +611,29 @@ export class Outliner extends AdvancedTransform {
         return returnStmts;
     }
 
-    private scalarsToPointers(region: Statement[], params: Param[], varrefs: Varref[]): void {
-        for (const stmt of region) {
+    private scalarsToPointers(params: Param[], varrefs: Varref[]): void {
+        for (const varref of varrefs) {
 
-            for (const varref of varrefs) {
+            for (const param of params) {
+                if (param.name === varref.name) {
+                    if (varref.type instanceof ElaboratedType) {
+                        const newVarref = param.type.isPointer ?
+                            ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", ClavaJoinPoints.varRef(param))) :
+                            ClavaJoinPoints.varRef(param);
+                        varref.replaceWith(newVarref);
+                    }
+                    if (varref.type instanceof BuiltinType || varref.type instanceof TypedefType || varref.type instanceof QualType) {
+                        const newVarref = ClavaJoinPoints.varRef(param);
 
-                for (const param of params) {
-                    if (param.name === varref.name) {
-                        if (varref.type instanceof ElaboratedType) {
-                            const newVarref = ClavaJoinPoints.varRef(param);
+                        if (varref.parent != undefined && varref.parent instanceof MemberAccess) {
+                            varref.parent.setArrow(true);
                             varref.replaceWith(newVarref);
                         }
-                        if (varref.type instanceof BuiltinType || varref.type instanceof TypedefType || varref.type instanceof QualType) {
-                            const newVarref = ClavaJoinPoints.varRef(param);
-
-                            if (varref.parent != undefined && varref.parent instanceof MemberAccess) {
-                                varref.parent.setArrow(true);
-                                varref.replaceWith(newVarref);
-                            }
-                            else {
-                                const op = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", newVarref));
-                                varref.replaceWith(op);
-                            }
-
+                        else {
+                            const op = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", newVarref));
+                            varref.replaceWith(op);
                         }
+
                     }
                 }
             }
