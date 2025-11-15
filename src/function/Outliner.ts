@@ -177,21 +177,28 @@ export class Outliner extends AdvancedTransform {
         return [fun, call];
     }
 
+    private exprIsPointer(expr: Expression): boolean {
+        const allJps = Query.searchFromInclusive(expr, Joinpoint, (jp) => (jp.type != null)).get();
+        return allJps.some((jp) => jp.type instanceof PointerType);
+    }
+
     private transformPointerReassignments(fun: FunctionJp, call: Call): void {
         const reassignedPointerParams: Param[] = [];
 
         fun.params.forEach((param) => {
             if (param.type instanceof PointerType) {
-                const pointee = param.type.pointee.desugarAll;
-                if (pointee instanceof BuiltinType) {
-                    return;
-                }
+                // const pointee = param.type.pointee.desugarAll;
+                // if (pointee instanceof BuiltinType) {
+                //     return;
+                // }
                 for (const varref of Query.searchFrom(fun.body, Varref, { name: param.name })) {
                     if (varref.parent instanceof BinaryOp) {
                         const binOp = varref.parent as BinaryOp;
                         if (binOp.isAssignment && binOp.left.code === varref.code) {
-                            reassignedPointerParams.push(param);
-                            break;
+                            if (this.exprIsPointer(binOp.right)) {
+                                reassignedPointerParams.push(param);
+                                break;
+                            }
                         }
                     }
                 }
