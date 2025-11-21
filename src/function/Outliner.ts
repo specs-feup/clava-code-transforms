@@ -89,7 +89,6 @@ export class Outliner extends AdvancedTransform {
         this.log("Wrapped outline region with begin and ending comments");
 
         //------------------------------------------------------------------------------
-        //const parentFun: FunctionJp | null = this.findParentFunction(begin);
         const parentFun = begin.getAncestor("function") as FunctionJp | null;
         if (parentFun == null) {
             this.logError("Could not find parent function for the outline region");
@@ -102,15 +101,6 @@ export class Outliner extends AdvancedTransform {
         const epilogue = split[2];
         this.log("Found " + region.length + " statements for the outline region");
         this.log("Prologue has " + prologue.length + " statements, and epilogue has " + epilogue.length);
-
-        //------------------------------------------------------------------------------
-        // const flt = this.flattenScopes(region);
-        // if (flt > 0) {
-        //     this.log("Flattened " + flt + " scope(s) in the outline region");
-        // }
-        // else {
-        //     this.log("No scopes were flattened in the outline region");
-        // }
 
         //------------------------------------------------------------------------------
         const globals = this.findGlobalVars();
@@ -138,12 +128,12 @@ export class Outliner extends AdvancedTransform {
         const referencedInRegion = this.findRefsInRegion(region);
         const funParams = this.createParams(referencedInRegion);
         const fun = this.createFunction(functionName, region, funParams, referencedInRegion);
-        this.log("Successfully created function \"" + functionName + "\"");
+        this.log(`Successfully created function "${functionName}"`);
 
         //------------------------------------------------------------------------------
         const callArgs = this.createArgs(fun, prologue, parentFun);
         let call = this.updateCall(callPlaceholder, fun, callArgs);
-        this.log("Successfully created call to \"" + functionName + "\"");
+        this.log(`Successfully created call to "${functionName}"`);
 
         //------------------------------------------------------------------------------
         // At this point, if the function has a premature return, it will be returning a value
@@ -187,17 +177,28 @@ export class Outliner extends AdvancedTransform {
         return [fun, call];
     }
 
+    private exprIsPointer(expr: Expression): boolean {
+        const allJps = Query.searchFromInclusive(expr, Joinpoint, (jp) => (jp.type != null)).get();
+        return allJps.some((jp) => jp.type instanceof PointerType);
+    }
+
     private transformPointerReassignments(fun: FunctionJp, call: Call): void {
         const reassignedPointerParams: Param[] = [];
 
         fun.params.forEach((param) => {
             if (param.type instanceof PointerType) {
+                // const pointee = param.type.pointee.desugarAll;
+                // if (pointee instanceof BuiltinType) {
+                //     return;
+                // }
                 for (const varref of Query.searchFrom(fun.body, Varref, { name: param.name })) {
                     if (varref.parent instanceof BinaryOp) {
                         const binOp = varref.parent as BinaryOp;
                         if (binOp.isAssignment && binOp.left.code === varref.code) {
-                            reassignedPointerParams.push(param);
-                            break;
+                            if (this.exprIsPointer(binOp.right)) {
+                                reassignedPointerParams.push(param);
+                                break;
+                            }
                         }
                     }
                 }
@@ -227,21 +228,6 @@ export class Outliner extends AdvancedTransform {
         });
     }
 
-    private flattenScopes(region: Statement[]): number {
-        const toFlatten: Scope[] = [];
-        for (const stmt of region) {
-            toFlatten.push(...Query.searchFromInclusive(stmt, Scope).get().filter((s) => s.joinPointType !== "body"));
-        }
-
-        const sf = new ScopeFlattener();
-        toFlatten.forEach((scope) => {
-            const prefix = IdGenerator.next("_s");
-            sf.flattenScope(scope, prefix);
-            this.log(`Flattened scope at line ${scope.line} with prefix "${prefix}"`);
-        });
-        return toFlatten.length;
-    }
-
     // fixes some edge cases where we may end up with top-level code like
     // if(__prematureExit0 == 1) { break; }
     private cleanupBreaks(fun: FunctionJp): void {
@@ -266,15 +252,6 @@ export class Outliner extends AdvancedTransform {
                         }
                     }
                 }
-            }
-        }
-    }
-
-    private removeContinuesDeprecated(fun: FunctionJp): void {
-        for (const brk of Query.searchFrom(fun, Continue)) {
-            if (brk.getAncestor("loop") == null) {
-                const returnStmt = ClavaJoinPoints.returnStmt();
-                brk.replaceWith(returnStmt);
             }
         }
     }
@@ -625,7 +602,7 @@ export class Outliner extends AdvancedTransform {
         }
 
         // make sure scalar refs are now dereferenced pointers to params
-        this.scalarsToPointers(region, params, varrefs);
+        this.scalarsToPointers(params, varrefs);
         return fun;
     }
 
@@ -641,30 +618,29 @@ export class Outliner extends AdvancedTransform {
         return returnStmts;
     }
 
-    private scalarsToPointers(region: Statement[], params: Param[], varrefs: Varref[]): void {
-        for (const stmt of region) {
+    private scalarsToPointers(params: Param[], varrefs: Varref[]): void {
+        for (const varref of varrefs) {
 
-            for (const varref of varrefs) {
+            for (const param of params) {
+                if (param.name === varref.name) {
+                    if (varref.type instanceof ElaboratedType) {
+                        const newVarref = param.type.isPointer ?
+                            ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", ClavaJoinPoints.varRef(param))) :
+                            ClavaJoinPoints.varRef(param);
+                        varref.replaceWith(newVarref);
+                    }
+                    if (varref.type instanceof BuiltinType || varref.type instanceof TypedefType || varref.type instanceof QualType) {
+                        const newVarref = ClavaJoinPoints.varRef(param);
 
-                for (const param of params) {
-                    if (param.name === varref.name) {
-                        if (varref.type instanceof ElaboratedType) {
-                            const newVarref = ClavaJoinPoints.varRef(param);
+                        if (varref.parent != undefined && varref.parent instanceof MemberAccess) {
+                            varref.parent.setArrow(true);
                             varref.replaceWith(newVarref);
                         }
-                        if (varref.type instanceof BuiltinType || varref.type instanceof TypedefType || varref.type instanceof QualType) {
-                            const newVarref = ClavaJoinPoints.varRef(param);
-
-                            if (varref.parent != undefined && varref.parent instanceof MemberAccess) {
-                                varref.parent.setArrow(true);
-                                varref.replaceWith(newVarref);
-                            }
-                            else {
-                                const op = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", newVarref));
-                                varref.replaceWith(op);
-                            }
-
+                        else {
+                            const op = ClavaJoinPoints.parenthesis(ClavaJoinPoints.unaryOp("*", newVarref));
+                            varref.replaceWith(op);
                         }
+
                     }
                 }
             }
@@ -729,20 +705,10 @@ export class Outliner extends AdvancedTransform {
 
         const validVarrefs: Varref[] = [];
         for (const varref of varrefs) {
-            //if (!this.declInPath(varref, stmtIds)) {
             if (!this.declInRegion(varref, region)) {
                 validVarrefs.push(varref);
             }
         }
-        // const uniqueRefs = new Set();
-        // this.log("Found " + uniqueRefs.size + " external variable references inside outline region");
-        // return validVarrefs.filter(varref => {
-        //     if (!uniqueRefs.has(varref.name)) {
-        //         uniqueRefs.add(varref.name);
-        //         return true;
-        //     }
-        //     return false;
-        // });
         this.log("Found " + validVarrefs.length + " external variable reference(s) inside outline region");
         return validVarrefs;
     }

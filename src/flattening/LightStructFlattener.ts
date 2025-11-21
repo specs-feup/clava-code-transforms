@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayAccess, ArrayType, BinaryOp, Body, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, Scope, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, ArrayType, BinaryOp, Body, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, PointerType, Scope, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 import { Voidifier } from "../function/Voidifier.js";
@@ -56,6 +56,10 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         this.logLine();
         this.log(`Flattening struct ${name} in function ${fun.name}`);
         let changes = 0;
+
+        // update signature if it has a double pointer to a struct
+        changes += this.ensureNoDoublePointers(fun, fields, name);
+
         // references to struct variables (and their members)
         changes += this.flattenCalls(fun, fields, name);
         changes += this.flattenMemberRefs(fun, fields, name);
@@ -73,6 +77,85 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         } else {
             this.log(`No occurrences of struct ${name} found in function ${fun.name}`);
         }
+        return changes;
+    }
+
+    private ensureNoDoublePointers(fun: FunctionJp, fields: Field[], name: string): number {
+        let changes = 0;
+        let paramIndexes: number[] = [];
+
+        for (let i = 0; i < fun.params.length; i++) {
+            const param = fun.params[i];
+
+            if (param.type instanceof PointerType) {
+                const pointee = param.type.pointee;
+                if (pointee instanceof PointerType) {
+                    const secondPointee = pointee.pointee;
+                    if (secondPointee.code.includes(name)) {
+                        paramIndexes.push(i);
+                    }
+                }
+            }
+        }
+        if (paramIndexes.length === 0) {
+            return changes;
+        }
+        const newParams: Param[] = [];
+
+        for (let i = 0; i < fun.params.length; i++) {
+            const param = fun.params[i];
+
+            if (!paramIndexes.includes(i)) {
+                newParams.push(param);
+                continue;
+            }
+
+            // remove a level of indirection off param
+            const newParam = ClavaJoinPoints.param(param.name, (param.type as PointerType).pointee);
+            newParams.push(newParam);
+
+            // find assigments to **param and set them to a memcpy
+            for (const ref of Query.searchFrom(fun, Varref, { name: param.name }).get()) {
+                const parentIsDeref = ((ref.parent instanceof UnaryOp) && ref.parent.operator === "*");
+                if (!parentIsDeref) {
+                    continue;
+                }
+                const deref = ref.parent as UnaryOp;
+                const grandParentIsAssign = (deref.parent instanceof BinaryOp) && (deref.parent.operator === "=");
+                if (!grandParentIsAssign) {
+                    continue;
+                }
+                const assign = deref.parent as BinaryOp;
+                const rhs = assign.right;
+                const lhs = assign.left;
+                const lhsIsDeref = (lhs instanceof UnaryOp) && (lhs.operator === "*");
+                if (!lhsIsDeref) {
+                    continue;
+                }
+                const rhsIsVarref = (rhs instanceof Varref) && rhs.type.code.includes(name);
+                if (!rhsIsVarref) {
+                    continue;
+                }
+
+                const argDest = ClavaJoinPoints.varRef(`${param.name}`, param.type);
+                const argSrc = ClavaJoinPoints.varRef(`${(rhs as Varref).name}`, rhs.type);
+                const argSize = ClavaJoinPoints.exprLiteral(`sizeof(${this.getBaseType(rhs.type).code})`);
+                const memcpyCall = ClavaJoinPoints.callFromName("memcpy", ClavaJoinPoints.type("void"), argDest, argSrc, argSize);
+                const memcpyStmt = ClavaJoinPoints.exprStmt(memcpyCall);
+
+                assign.getAncestor("statement")!.replaceWith(memcpyStmt);
+                changes++;
+                this.log(`  Replaced double pointer assignment to ${param.name} with memcpy`);
+            }
+            // update all calls to pass param directly
+            for (const call of Query.search(Call, { name: fun.name }).get()) {
+                const arg = call.args[i];
+                if ((arg instanceof UnaryOp) && (arg.operator === "&")) {
+                    call.setArg(i, arg.children[0] as Expression);
+                }
+            }
+        }
+        fun.setParams(newParams);
         return changes;
     }
 
@@ -456,8 +539,49 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         let changes = 0;
 
         Query.searchFrom(fun, Call).get().forEach((call) => {
-            changes += this.flattenCall(call, fields, name);
+            if (call.name == "memcpy") {
+                changes += this.flattenMemcpyCall(call, fields, name);
+            }
+            else {
+                changes += this.flattenCall(call, fields, name);
+            }
         });
+        return changes;
+    }
+
+    private flattenMemcpyCall(call: Call, fields: Field[], name: string): number {
+        let changes = 0;
+
+        const srcArg = call.args[1];
+        const destArg = call.args[0];
+
+        if (!srcArg.type.code.includes(name) || !destArg.type.code.includes(name)) {
+            return changes;
+        }
+
+        const newSrcArgs = this.flattenCallArg(srcArg, fields);
+        const newDestArgs = this.flattenCallArg(destArg, fields);
+
+        const newCalls: Call[] = [];
+        for (let i = 0; i < fields.length; i++) {
+            const field = fields[i];
+            const newSrcArg = newSrcArgs[i];
+            const newDestArg = newDestArgs[i];
+
+            const sizeExpr = ClavaJoinPoints.exprLiteral(`sizeof(${this.getBaseType(field.type).code})`);
+            const newMemcpyCall = ClavaJoinPoints.callFromName("memcpy", ClavaJoinPoints.type("void"), newDestArg, newSrcArg, sizeExpr);
+            newCalls.push(newMemcpyCall);
+        }
+
+        const parentStmt = call.getAncestor("statement") as Statement;
+        newCalls.forEach((newCall) => {
+            const newExprStmt = ClavaJoinPoints.exprStmt(newCall);
+            parentStmt.insertBefore(newExprStmt);
+        });
+        parentStmt.detach();
+
+        this.log(`  Flattened memcpy call args {${srcArg.code}, ${destArg.code}}`);
+        changes += 1;
         return changes;
     }
 

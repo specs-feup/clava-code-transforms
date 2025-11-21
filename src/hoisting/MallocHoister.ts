@@ -1,11 +1,9 @@
-import { BinaryOp, Call, ExprStmt, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
-import { AdvancedTransform } from "../AdvancedTransform.js";
+import { BinaryOp, Call, ExprStmt, FileJp, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
-import { CallHoister } from "./CallHoister.js";
 import { AHoister } from "./AHoister.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
-import Inliner, { InlinerOptions } from "@specs-feup/clava/api/clava/code/Inliner.js";
 import { CallTreeInliner } from "../function/CallTreeInliner.js";
+import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 
 export class MallocHoister extends AHoister {
 
@@ -14,11 +12,20 @@ export class MallocHoister extends AHoister {
     }
 
     public hoistAllMallocs(targetPoint?: FunctionJp): number {
-        targetPoint = this.getTargetPoint(targetPoint);
-        if (targetPoint == undefined) {
+        let actualPoint = this.getTargetPoint(targetPoint);
+        if (actualPoint == undefined) {
+            this.logError("No valid target point found for malloc hoisting.");
             return 0;
         }
-        this.inlineAll(targetPoint);
+        const actualPointName = actualPoint.name;
+        this.inlineAll(actualPoint);
+
+        // inlineAll rebuilds the AST, so we need to get the target point again
+        actualPoint = this.getTargetPoint(actualPointName);
+        if (actualPoint == undefined) {
+            this.logError("No valid target point found for malloc hoisting after inlining.");
+            return 0;
+        }
 
         const calls = Query.search(Call, (c) => c.name === "malloc" || c.name === "calloc").get();
         let hoistedCount = 0;
@@ -27,20 +34,26 @@ export class MallocHoister extends AHoister {
         this.logLine();
         for (const call of calls) {
             const parentFun = call.getAncestor("function") as FunctionJp;
-            const hoisted = this.hoistMalloc(call, targetPoint, false);
+            const hoisted = this.hoistMalloc(call, actualPoint, false);
 
             if (hoisted) {
                 this.log(`Successfully hoisted malloc() at function ${parentFun.name}:${call.line}`);
                 this.logLine();
                 hoistedCount++;
             } else {
+                this.log(`Could not hoist malloc() at function ${parentFun.name}:${call.line}`);
+                this.logLine();
                 nonHoistedCount++;
             }
         }
+        const removedFrees = this.removeFrees(actualPoint);
+        this.removeRedundantFunctionDecls(actualPoint);
+
         this.log(`MallocHoister Summary:`);
         this.log(`Total malloc/calloc calls found: ${calls.length}`);
         this.log(`Successfully hoisted: ${hoistedCount}`);
         this.log(`Not hoisted: ${nonHoistedCount}`);
+        this.log(`Removed free() calls: ${removedFrees}`);
         this.logLine();
         return hoistedCount;
     }
@@ -75,7 +88,9 @@ export class MallocHoister extends AHoister {
             return false;
         }
         // build param
-        const dummyName = `memregion_${parentFun.name}_${call.line}`;
+        const id = IdGenerator.next("memregion_");
+        const size = this.getSizeEstimate(call);
+        const dummyName = `${id}_size${size}`;
         const lhs = assignment.left;
         const type = lhs.type;
         const newParam = ClavaJoinPoints.param(dummyName, type);
@@ -99,8 +114,40 @@ export class MallocHoister extends AHoister {
             const newArg = ClavaJoinPoints.varRef(dummyName, type);
             call.addArg(newArg.code, newArg.type);
         }
-
         return true;
+    }
+
+    private removeRedundantFunctionDecls(targetFun: FunctionJp): void {
+        const allFuns = Query.search(FunctionJp, (f) => f.name === targetFun.name).get();
+        allFuns.forEach((fun) => {
+            if (!fun.isImplementation) {
+                fun.detach();
+                this.log(`Removed old declaration of ${fun.name}() at ${fun.filename}:${fun.line}.`);
+            }
+        });
+
+        const newDecl = ClavaJoinPoints.stmtLiteral(`${targetFun.getDeclaration(true)};`);
+        const file = targetFun.getAncestor("file") as FileJp;
+        const firstFun = Query.searchFrom(file, FunctionJp).first();
+        if (firstFun) {
+            firstFun.insertBefore(newDecl);
+            this.log(`Inserted new declaration of ${targetFun.name}() at ${file.filename}.`);
+        }
+    }
+
+
+    private getSizeEstimate(call: Call): string {
+        return "N";
+    }
+
+    private removeFrees(targetPoint: FunctionJp): number {
+        const frees = Query.searchFrom(targetPoint, Call, (c) => c.name === "free").get();
+        frees.forEach((freeCall) => {
+            const exprStmt = freeCall.getAncestor("exprStmt") as ExprStmt;
+            const comment = ClavaJoinPoints.comment(exprStmt.code);
+            exprStmt.replaceWith(comment);
+        });
+        return frees.length;
     }
 
     private inlineAll(startingPoint: FunctionJp): boolean {
