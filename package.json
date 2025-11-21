@@ -29,6 +29,9 @@
     "test:structdecomp-cpp": "clava classic dist/test/TestLegacyStructDecomposer.js -p inputs/structdecomp-cpp/ -std c++11",
     "test:structdecomp-optiflow": "clava classic dist/test/TestLegacyStructDecomposer.js -p inputs/optical-flow/ -std c++11",
     "test:structdecomp-disparity": "clava classic dist/test/TestLightStructDecomposer.js -p inputs/disparity/ -std c11",
+    "test:vrs": "cross-env NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest --detectOpenHandles --forceExit -- test/VectorReduce.test.ts",
+    "test:full-vrs-partial":"npm run build && npx clava classic dist/test/TestVectorReduce.js -j -p inputs/vectorreduce/SimplePartial.c -o dist/ && gcc -o dist/vrs-simple-partial-ori inputs/vectorreduce/SimplePartial.c && gcc -o dist/vrs-simple-partial-mod dist/woven_code/SimplePartial.c && echo 'original SimplePartial: ' && dist/vrs-simple-partial-ori && echo 'modified SimplePartial: ' && dist/vrs-simple-partial-mod",
+    "test:full-vrs-complete":"npm run build && npx clava classic dist/test/TestVectorReduce.js -j -p inputs/vectorreduce/SimpleComplete.c -o dist/ && gcc -o dist/vrs-simple-complete-ori inputs/vectorreduce/SimpleComplete.c && gcc -o dist/vrs-simple-complete-mod dist/woven_code/SimpleComplete.c && echo 'original SimpleComplete: ' && dist/vrs-simple-complete-ori && echo 'modified SimpleComplete: ' && dist/vrs-simple-complete-mod",
     "test:voidifying": "clava dist/test/TestVoidifier.js -- clang inputs/voidifying/",
     "bench:3d-rend": "clava classic dist/test/TestBenchmark3DRendering.js -p inputs/3d-rendering/ -std c++11",
     "bench:digit-recog": "clava classic dist/test/TestBenchmarkDigitRecog.js -p inputs/digit-recognition/ -std c++11",
@@ -56,9 +59,10 @@
     "dist/src"
   ],
   "dependencies": {
-    "@specs-feup/clava": "^3.0.8",
+    "@specs-feup/clava": "^3.0.32",
     "@specs-feup/lara": "^3.0.5",
-    "chalk": "^5.3.0"
+    "chalk": "^5.3.0",
+    "yocto-queue": "^1.2.2"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
