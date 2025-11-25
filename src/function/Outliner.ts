@@ -312,6 +312,20 @@ export class Outliner extends AdvancedTransform {
                 }
             }
         }
+        // Special case: we also consider return statenents that return from other outlined regions as breaks
+        for (const ret of Query.searchFrom(fun, ReturnStmt, { numChildren: 0 })) {
+            const retScope = ret.getAncestor("scope") as Scope;
+            // skip if return is the only statement in the scope or if it's not the last statement (unlikely)
+            if (retScope.stmts.at(-1)!.astId != ret.astId || retScope.stmts.length == 1) {
+                continue;
+            }
+            // add it as a "break" if the previous statement was a premature exit assignment
+            // a better check would be if it is an assignment to a premature exit variable
+            const prevStmt = retScope.stmts.at(-2)!;
+            if (prevStmt.code.includes("__prem")) {
+                breaks.push(ret);
+            }
+        }
 
         if (breaks.length == 0) {
             return;
@@ -333,7 +347,8 @@ export class Outliner extends AdvancedTransform {
         call.insertAfter(ifStmt);
 
         // Create premature exit parameter
-        const preExitParam = ClavaJoinPoints.param("_prematureExit", ClavaJoinPoints.type("int*"));
+        const preExitParamName = IdGenerator.next("__premExitParam");
+        const preExitParam = ClavaJoinPoints.param(preExitParamName, ClavaJoinPoints.type("int*"));
         fun.addParam(preExitParam.name, preExitParam.type);
 
         // Replace breaks with premature exit
