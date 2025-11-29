@@ -151,6 +151,15 @@ export class Outliner extends AdvancedTransform {
             this.log("No need to ensure that the outlined function returns void, as it has no early returns");
         }
 
+        // If the function wasn't changed, we may still need to add an early return check,
+        // because we may be outlining a previously outlined region that already had early returns
+        if (newCall == null) {
+            const added = this.addEarlyReturnCheck(fun, call);
+            if (added) {
+                this.log("Added early return check to the outlined function and its call");
+            }
+        }
+
         //------------------------------------------------------------------------------
         // Remove some of the redundancies introduced by the outlining process
         this.removeRedundancies(fun);
@@ -175,6 +184,28 @@ export class Outliner extends AdvancedTransform {
         this.log("Finished cleanup");
 
         return [fun, call];
+    }
+
+    private addEarlyReturnCheck(fun: FunctionJp, call: Call): boolean {
+        const earlyReturnVar = fun.params.find((param) => param.name.startsWith("__rtr_val"));
+        const earlyReturnFlag = fun.params.find((param) => param.name.startsWith("__rtr_flag"));
+        if (earlyReturnVar == null || earlyReturnFlag == null) {
+            return false;
+        }
+        const flagArgIdx = fun.params.findIndex((param) => param.name === earlyReturnFlag.name);
+        const flagArg = Query.searchFromInclusive(call.argList[flagArgIdx], Varref, { name: earlyReturnFlag.name }).get()[0];
+        if (flagArg == null) {
+            throw new Error("Could not find argument for early return flag parameter");
+        }
+
+        const varref = ClavaJoinPoints.varRef(flagArg.name, flagArg.type);
+        const wrapped = varref.type.isPointer ? ClavaJoinPoints.unaryOp("*", varref) : varref;
+        const returnStmt = ClavaJoinPoints.returnStmt();
+        const scope = ClavaJoinPoints.scope(returnStmt);
+        const ifStmt = ClavaJoinPoints.ifStmt(wrapped, scope);
+
+        call.getAncestor("statement")!.insertAfter(ifStmt);
+        return true;
     }
 
     private exprIsPointer(expr: Expression): boolean {
