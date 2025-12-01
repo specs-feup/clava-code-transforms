@@ -3,21 +3,24 @@ import { AdvancedTransform } from "../AdvancedTransform.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { Inliner } from "./Inliner.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
+import Clava from "@specs-feup/clava/api/clava/Clava.js";
 
 export class CallTreeInliner extends AdvancedTransform {
     constructor(silent: boolean = false) {
         super("CallTreeInliner", silent);
     }
 
-    public inlineCallTree(topLevelFunction: FunctionJp, removeInlined: boolean = false, prefix: string = "_i"): boolean {
+    public inlineCallTree(topLevelFunction: FunctionJp, removeInlined: boolean = false, prefix: string = "_i", interResultsPath: string = ""): boolean {
         let isChanging = true;
         let totalInlined = 0;
+        let iter = 0;
         const inlinedFuns: Set<FunctionJp> = new Set();
 
         const inliner = new Inliner(true);
         this.log(`Starting call tree inlining from function ${topLevelFunction.name}`);
 
         while (isChanging) {
+            let inlinedThisIter = 0;
             isChanging = false;
             const calls = Query.searchFrom(topLevelFunction, Call).get();
 
@@ -31,6 +34,7 @@ export class CallTreeInliner extends AdvancedTransform {
                 if (inlineOk) {
                     isChanging = true;
                     totalInlined++;
+                    inlinedThisIter++;
                     inlinedFuns.add(call.function);
                     this.log(`  Inlined call to function ${call.function.name}()`);
                 }
@@ -38,6 +42,13 @@ export class CallTreeInliner extends AdvancedTransform {
                     this.logWarning(`  Failed to inline call to function ${call.function.name} at ${call.location}`);
                 }
             }
+            iter++;
+            this.log(`Iteration ${iter} completed. Inlined ${inlinedThisIter} function calls.`);
+
+            if (interResultsPath !== "") {
+                this.writeIntermediateResult(interResultsPath, iter);
+            }
+
         }
         this.log(`Inlined a total of ${totalInlined} function calls in the call tree of function ${topLevelFunction.name}.`);
 
@@ -111,6 +122,12 @@ export class CallTreeInliner extends AdvancedTransform {
         }
         this.log(`Reverted global parameters to pointers in function ${fun.name}.`);
         return true;
+    }
+
+    private writeIntermediateResult(path: string, iter: number): void {
+        const fullPath = `${path}/inline_iter${iter}`;
+        Clava.writeCode(fullPath);
+        this.log(`Wrote intermediate inlining result to ${fullPath}`);
     }
 
     private removeInlinedFunctions(clusterFun: FunctionJp, inlinedFuns: Set<FunctionJp>): void {
