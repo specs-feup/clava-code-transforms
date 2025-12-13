@@ -39,6 +39,7 @@
     "clean": "rm -rf node_modules package-lock.json dist/ woven_code/ output/"
   },
   "exports": {
+    "./AdvancedTransform": "./dist/src/AdvancedTransform.js",
     "./AllocatorInliner": "./dist/src/function/AllocatorInliner.js",
     "./Amalgamator": "./dist/src/program/Amalgamator.js",
     "./ArrayFlattener": "./dist/src/flattening/ArrayFlattener.js",
