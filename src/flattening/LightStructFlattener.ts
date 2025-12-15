@@ -1,6 +1,6 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayAccess, ArrayType, BinaryOp, Body, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, PointerType, Scope, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
+import { ArrayAccess, ArrayType, BinaryOp, Body, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, PointerType, Scope, Statement, StorageClass, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import Clava from "@specs-feup/clava/api/clava/Clava.js";
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
 import { Voidifier } from "../function/Voidifier.js";
@@ -368,6 +368,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         fields.forEach((field) => {
             const newDeclName = `${decl.name}_${field.name}`;
             const baseType = this.getBaseType(field.type);
+            const isStatic = decl.storageClass == StorageClass.STATIC;
 
             let newDeclType = ClavaJoinPoints.pointer(baseType);
             if (decl.type.isPointer) {
@@ -377,6 +378,9 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             }
 
             const newDecl = ClavaJoinPoints.varDeclNoInit(newDeclName, newDeclType);
+            if (isStatic) {
+                newDecl.setStorageClass(StorageClass.STATIC);
+            }
             const declStmt = ClavaJoinPoints.declStmt(newDecl);
             declStmts.push(declStmt);
         });
