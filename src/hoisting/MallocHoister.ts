@@ -1,4 +1,4 @@
-import { BinaryOp, Call, ExprStmt, FileJp, FunctionJp } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, ExprStmt, FileJp, FunctionJp, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AHoister } from "./AHoister.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
@@ -11,37 +11,37 @@ export class MallocHoister extends AHoister {
         super(silent, "MallocHoister");
     }
 
-    public hoistAllMallocs(targetPoint?: FunctionJp): number {
+    public hoistAllMallocs(targetPoint?: FunctionJp, skipInlining: boolean = false): number {
         let actualPoint = this.getTargetPoint(targetPoint);
         if (actualPoint == undefined) {
             this.logError("No valid target point found for malloc hoisting.");
             return 0;
         }
         const actualPointName = actualPoint.name;
-        this.inlineAll(actualPoint);
-
-        // inlineAll rebuilds the AST, so we need to get the target point again
-        actualPoint = this.getTargetPoint(actualPointName);
-        if (actualPoint == undefined) {
-            this.logError("No valid target point found for malloc hoisting after inlining.");
-            return 0;
+        if (!skipInlining) {
+            this.inlineAll(actualPoint);
+            // inlineAll rebuilds the AST, so we need to get the target point again
+            actualPoint = this.getTargetPoint(actualPointName);
+            if (actualPoint == undefined) {
+                this.logError("No valid target point found for malloc hoisting after inlining.");
+                return 0;
+            }
         }
 
-        const calls = Query.search(Call, (c) => c.name === "malloc" || c.name === "calloc").get();
+        const calls = Query.searchFrom(actualPoint, Call, (c) => c.name === "malloc" || c.name === "calloc").get();
         let hoistedCount = 0;
         let nonHoistedCount = 0;
 
         this.logLine();
         for (const call of calls) {
-            const parentFun = call.getAncestor("function") as FunctionJp;
             const hoisted = this.hoistMalloc(call, actualPoint, false);
 
             if (hoisted) {
-                this.log(`Successfully hoisted malloc() at function ${parentFun.name}:${call.line}`);
+                this.log(`Successfully hoisted malloc() at function ${actualPoint.name}:${call.line}`);
                 this.logLine();
                 hoistedCount++;
             } else {
-                this.log(`Could not hoist malloc() at function ${parentFun.name}:${call.line}`);
+                this.log(`Could not hoist malloc() at function ${actualPoint.name}:${call.line}`);
                 this.logLine();
                 nonHoistedCount++;
             }
@@ -82,37 +82,36 @@ export class MallocHoister extends AHoister {
             this.logError(`Malloc/calloc call ${call.code} is not assigned to any variable.`);
             return false;
         }
-        const parentFun = call.getAncestor("function") as FunctionJp;
-        if (parentFun.name !== targetPoint.name) {
-            this.logError(`Cannot hoist malloc/calloc call ${call.code} from function ${parentFun.name} to target function ${targetPoint.name}.`);
-            return false;
-        }
+
         // build param
         const id = IdGenerator.next("memregion_");
-        const size = this.getSizeEstimate(call);
+        const size = this.getSize(call);
         const dummyName = `${id}_size${size}`;
         const lhs = assignment.left;
         const type = lhs.type;
         const newParam = ClavaJoinPoints.param(dummyName, type);
-        parentFun.setParams([...parentFun.params, newParam]);
+        targetPoint.setParams([...targetPoint.params, newParam]);
 
         // update malloc assignment to use the param instead
         const newVarref = newParam.varref();
         assignment.right.replaceWith(newVarref);
 
         // update every call to parentFun to have the hoisted malloc just before
-        const callsToParent = Query.search(Call, { name: parentFun.name }).get();
+        const callsToParent = Query.search(Call, { name: targetPoint.name }).get();
         for (const call of callsToParent) {
             const callExpr = call.parent as ExprStmt;
 
-            // for now, we just declare the pointer. We'll implement the malloc later
-            const pointerDecl = ClavaJoinPoints.varDeclNoInit(dummyName, type);
+            const mallocExprStr = `(${type.code}) malloc(${size})`;
+            const mallocExpr = ClavaJoinPoints.exprLiteral(mallocExprStr, type);
+            const pointerDecl = ClavaJoinPoints.varDecl(dummyName, mallocExpr);
             const declStmt = ClavaJoinPoints.declStmt(pointerDecl)
             callExpr.insertBefore(declStmt);
 
             // update call
             const newArg = ClavaJoinPoints.varRef(dummyName, type);
             call.addArg(newArg.code, newArg.type);
+
+            // TODO: add free() after the call
         }
         return true;
     }
@@ -136,8 +135,17 @@ export class MallocHoister extends AHoister {
     }
 
 
-    private getSizeEstimate(call: Call): string {
-        return "N";
+    private getSize(call: Call): number {
+        const stmt = call.getAncestor("exprStmt") as ExprStmt;
+        const prevSibling = stmt.siblingsLeft.at(-1);
+        if (prevSibling != null && (prevSibling instanceof WrapperStmt)) {
+            const pragma = prevSibling.code;
+            const match = pragma.match(/\bmax\s*=\s*(\d+)/);
+            return match ? Number(match[1]) : 16;
+        }
+        else {
+            return 16;
+        }
     }
 
     private removeFrees(targetPoint: FunctionJp): number {
