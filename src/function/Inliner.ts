@@ -1,4 +1,4 @@
-import { BinaryOp, Call, DeclStmt, Expression, FloatLiteral, FunctionJp, IntLiteral, Literal, Param, ParenExpr, ReturnStmt, Scope, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, DeclStmt, Expression, FloatLiteral, FunctionJp, IntLiteral, Literal, Param, ParenExpr, ReturnStmt, Statement, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js";
 import { AdvancedTransform } from "../AdvancedTransform.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
 import NormalizeToSubset from "@specs-feup/clava/api/clava/opt/NormalizeToSubset.js";
@@ -128,7 +128,25 @@ export class Inliner extends AdvancedTransform {
 
     protected transformStatements(fun: FunctionJp, call: Call, id: string): Statement[] {
         const transformedStmts: Statement[] = [];
-        const argToParamMap = this.buildParameterMap(call, fun, id, transformedStmts);
+
+        const argToParamMap = new Map<string, Expression>();
+        for (let i = 0; i < call.args.length; i++) {
+            const arg = call.args[i];
+            const param = fun.params[i];
+
+            if (this.isNeverReassigned(param, fun)) {
+                argToParamMap.set(param.name, arg);
+            }
+            else {
+                const newVarName = `${param.name}_local_${id}`;
+                const newVardecl = ClavaJoinPoints.varDecl(newVarName, arg.copy());
+                const declStmt = ClavaJoinPoints.declStmt(newVardecl);
+                transformedStmts.push(declStmt);
+                const newVarref = newVardecl.varref();
+                argToParamMap.set(param.name, newVarref);
+                this.log(` Param ${param.name} is reassigned in ${fun.name}; created local copy ${newVarName}.`);
+            }
+        }
 
         let useEndLabel = false;
         const endLabel = ClavaJoinPoints.labelDecl(`end_inline${id}`);
@@ -140,27 +158,14 @@ export class Inliner extends AdvancedTransform {
                 continue;
             }
             // change varrefs under stmt tree to either arg expressions or renamed variables
-            const varrefs = [...Query.searchFrom(stmt, Varref).get(), ...this.getVarrefsInInit(fun, stmt)];
-
+            const varrefs = [...Query.searchFrom(stmt, Varref).get(), ...this.getVarrefsInInit(fun, stmt)]
             for (const varref of varrefs) {
                 if (argToParamMap.has(varref.name)) {
-                    let argExpr = argToParamMap.get(varref.name) as Expression;
-
-                    // avoid *(&var) situations, simplify them to just var right now
-                    const argIsAddrOf = (argExpr instanceof UnaryOp) && (argExpr.operator == "&");
-                    let effectiveParent = varref.parent;
-                    if (effectiveParent instanceof ParenExpr) {
-                        effectiveParent = effectiveParent.parent;
-                    }
-                    const parentIsDeref = (effectiveParent instanceof UnaryOp) && (effectiveParent.operator == "*");
-
-                    if (argIsAddrOf && parentIsDeref) {
-                        argExpr = argExpr.children[0] as Expression;
-                        effectiveParent.replaceWith(argExpr.copy() as Expression);
-                    }
-                    else {
-                        varref.replaceWith(argExpr.copy() as Expression);
-                    }
+                    const argExpr = argToParamMap.get(varref.name) as Expression;
+                    const newVarref = !(argExpr instanceof Varref) ?
+                        ClavaJoinPoints.parenthesis(argExpr.deepCopy() as Expression) :
+                        argExpr.deepCopy();
+                    varref.replaceWith(newVarref);
                 }
                 else if (varref.isFunctionCall || (varref.decl as Vardecl).isGlobal) {
                     continue;
@@ -194,29 +199,6 @@ export class Inliner extends AdvancedTransform {
         return transformedStmts;
     }
 
-    private buildParameterMap(call: Call, fun: FunctionJp, id: string, transformedStmts: Statement[]) {
-        const argToParamMap = new Map<string, Expression>();
-        for (let i = 0; i < call.args.length; i++) {
-            const param = fun.params[i];
-            const argClone = call.args[i].copy() as Expression;
-            const arg = argClone instanceof ParenExpr ? this.removeParenthesis(argClone) : argClone;
-
-            if (this.isNeverReassigned(param, fun) && !(arg instanceof Literal)) {
-                argToParamMap.set(param.name, arg);
-            }
-            else {
-                const newVarName = `${param.name}_local_${id}`;
-                const newVardecl = ClavaJoinPoints.varDecl(newVarName, arg.copy());
-                const declStmt = ClavaJoinPoints.declStmt(newVardecl);
-                transformedStmts.push(declStmt);
-                const newVarref = newVardecl.varref();
-                argToParamMap.set(param.name, newVarref);
-                this.log(`Parameter ${param.name} will be mapped to local variable ${newVarName}.`);
-            }
-        }
-        return argToParamMap;
-    }
-
     private getVarrefsInInit(fun: FunctionJp, stmt: Statement): Varref[] {
         const varrefs: Varref[] = [];
         for (const vardecl of Query.searchFrom(stmt, Vardecl).get()) {
@@ -239,105 +221,53 @@ export class Inliner extends AdvancedTransform {
         while (changed) {
             changed = false;
             // remove redundant parenthesis
-            changed ||= this.simplifyStmtParenthesis(stmt);
+            for (const parenExpr of Query.searchFromInclusive(stmt, ParenExpr, (p) => !(p.parent instanceof ParenExpr) && p.children.length == 1).get()) {
 
+                const child = parenExpr.children[0];
+                if ((child instanceof Varref) || (child instanceof Literal)) {
+                    parenExpr.replaceWith(child);
+                    changed = true;
+                }
+                if (child instanceof ParenExpr) {
+                    parenExpr.replaceWith(child);
+                    changed = true;
+                }
+            }
+            for (const lit of Query.searchFrom(stmt, Literal).get()) {
+                if (lit.parent instanceof ParenExpr) {
+                    const parenExpr = lit.parent as ParenExpr;
+                    parenExpr.replaceWith(lit);
+                    changed = true;
+                }
+            }
             // param turned into literal because arg was literal
             // may result in things like &123 in function calls
-            //changed ||= this.convertExprToVars(stmt);
+            for (const op of Query.searchFrom(stmt, UnaryOp, { operator: "&" }).get()) {
+                const child = op.children[0];
+                if (child instanceof Literal) {
+                    const parentStmt = op.getAncestor("statement") as Statement;
+                    const newVarName = IdGenerator.next("_lit");
 
+                    const newVardecl = ClavaJoinPoints.varDecl(newVarName, child.copy());
+                    parentStmt.insertBefore(newVardecl);
+
+                    const newVarref = newVardecl.varref();
+                    op.setFirstChild(newVarref);
+                    changed = true;
+                }
+            }
             // the classic addr-of operator followed by deref, i.e, *(&var)
-            changed ||= this.simplifyDerefAddrOf(stmt);
-        }
-    }
+            for (const derefOp of Query.searchFrom(stmt, UnaryOp, { operator: "*" }).get()) {
+                const child = (derefOp.children[0] instanceof ParenExpr) ?
+                    derefOp.children[0].children[0] :
+                    derefOp.children[0];
 
-    private createTempVarForExpr(expr: Expression, insertionPoint: Statement, prefix: string = "_tmp"): Varref {
-        const newVarName = IdGenerator.next(prefix);
-        const newVardecl = ClavaJoinPoints.varDecl(newVarName, expr.copy());
-        const declStmt = ClavaJoinPoints.declStmt(newVardecl);
-        insertionPoint.insertBefore(declStmt);
-
-        const newVarref = newVardecl.varref();
-        return newVarref;
-    }
-
-    private simplifyDerefAddrOf(stmt: Statement): boolean {
-        let changed = false;
-        for (const derefOp of Query.searchFrom(stmt, UnaryOp, { operator: "*" }).get()) {
-            const child = (derefOp.children[0] instanceof ParenExpr) ?
-                derefOp.children[0].children[0] :
-                derefOp.children[0];
-
-            if (child instanceof UnaryOp && child.operator == "&") {
-                const grandChild = child.children[0];
-                derefOp.replaceWith(grandChild);
-                changed = true;
-            }
-        }
-        return changed;
-    }
-
-    private removeParenthesis(stmt: ParenExpr): Expression {
-        let child = stmt.children[0] as Expression;
-        while (child instanceof ParenExpr && child.children.length == 1) {
-            child = child.children[0] as Expression;
-        }
-        return child;
-    }
-
-    private convertExprToVars(stmt: Statement): boolean {
-        let changed = false;
-        for (const op of Query.searchFrom(stmt, UnaryOp, (o) => ["&", "*"].includes(o.operator)).get()) {
-            let child = this.removeParenthesis(op.children[0] as ParenExpr);
-            const insertionPoint = stmt.parent instanceof Scope ? stmt : stmt.parent as Statement;
-
-            if (child instanceof Literal) {
-                const newVarref = this.createTempVarForExpr(child, insertionPoint, "_lit");
-                child.replaceWith(newVarref);
-                changed = true;
-            }
-            else if ((child instanceof UnaryOp) && ["&", "*"].includes(child.operator)) {
-                const grandChild = child.children[0];
-                const cancelOut = (op.operator == "&" && child.operator == "*") || (op.operator == "*" && child.operator == "&");
-                if (cancelOut) {
-                    op.replaceWith(grandChild);
-                    changed = true;
-                }
-                else {
-                    const newVarref = this.createTempVarForExpr(child, insertionPoint, "_unop");
-                    op.replaceWith(newVarref);
+                if (child instanceof UnaryOp && child.operator == "&") {
+                    const grandChild = child.children[0];
+                    derefOp.replaceWith(grandChild);
                     changed = true;
                 }
             }
-            else if (!(child instanceof Varref)) {
-                const newVarref = this.createTempVarForExpr(child, insertionPoint, "_expr");
-                child.replaceWith(newVarref);
-                changed = true;
-            }
         }
-        return changed;
-    }
-
-    private simplifyStmtParenthesis(stmt: Statement): boolean {
-        let changed = false;
-        for (const parenExpr of Query.searchFromInclusive(stmt, ParenExpr, (p) => !(p.parent instanceof ParenExpr) && p.children.length == 1).get()) {
-
-            const child = parenExpr.children[0];
-            if ((child instanceof Varref) || (child instanceof Literal)) {
-                parenExpr.replaceWith(child);
-                changed = true;
-            }
-            if (child instanceof ParenExpr) {
-                parenExpr.replaceWith(child);
-                changed = true;
-            }
-        }
-        for (const lit of Query.searchFrom(stmt, Literal).get()) {
-            if (lit.parent instanceof ParenExpr) {
-                const parenExpr = lit.parent as ParenExpr;
-                parenExpr.replaceWith(lit);
-                changed = true;
-            }
-        }
-        return changed;
     }
 }
