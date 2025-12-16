@@ -210,8 +210,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
     private flattenMemberRefs(fun: FunctionJp, fields: Field[], name: string): number {
         let changes = 0;
-
-        for (const ref of Query.searchFrom(fun, Varref)) {
+        for (const ref of Query.searchFrom(fun, Varref).get()) {
             const type = ref.type;
             if (type.code.includes(name)) {
                 const isSimpleMemberAccess = ref.parent instanceof MemberAccess;
@@ -259,10 +258,16 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             const baseVarrefName = `${ref.name}_${fieldName}`;
             const newVarrefName = isDeref ? `(*${baseVarrefName})` : (isAddrOf ? `(&${baseVarrefName})` : baseVarrefName);
             const newVarref = ClavaJoinPoints.exprLiteral(newVarrefName);
+            const isArrayAccess = member.parent instanceof ArrayAccess;
 
             if (member.arrow) {
+                //foo->bar[i]
+                if (isArrayAccess) {
+                    const simpleVarref = ClavaJoinPoints.exprLiteral(baseVarrefName);
+                    member.replaceWith(simpleVarref);
+                }
                 //foo->bar, where bar is a scalar
-                if (!this.fieldIsArray(member, fields)) {
+                else if (!this.fieldIsArray(member, fields) && !isDeref) {
                     const deref = ClavaJoinPoints.exprLiteral(`(*${newVarrefName})`);
                     member.replaceWith(deref);
                 }
@@ -276,6 +281,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                 //foo.bar, where bar is anything
                 member.replaceWith(newVarref);
             }
+
             changes++;
             this.log(`  Flattened member ref ${ref.name}${member.arrow ? "->" : "."}${fieldName}`);
         }
