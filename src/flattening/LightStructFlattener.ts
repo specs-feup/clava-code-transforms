@@ -210,7 +210,30 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
     private flattenMemberRefs(fun: FunctionJp, fields: Field[], name: string): number {
         let changes = 0;
-        for (const ref of Query.searchFrom(fun, Varref).get()) {
+
+        for (const arrAcc of Query.searchFrom(fun, ArrayAccess).get()) {
+            for (let i = 1; i < arrAcc.children.length; i++) {
+                const child = arrAcc.children[i];
+                if (child instanceof MemberAccess) {
+                    const tmpName = IdGenerator.next("__idxExpr");
+                    const newDecl = ClavaJoinPoints.varDecl(tmpName, child.copy());
+                    const declStmt = ClavaJoinPoints.declStmt(newDecl);
+                    arrAcc.getAncestor("statement")!.insertBefore(declStmt);
+
+                    const newIdx = ClavaJoinPoints.varRef(tmpName, child.type);
+                    child.replaceWith(newIdx);
+                }
+            }
+        }
+
+        const regularRefs = Query.searchFrom(fun, Varref).get();
+        changes = this.flattenRefList(regularRefs, name, changes, fields);
+
+        return changes;
+    }
+
+    private flattenRefList(refs: Varref[], name: string, changes: number, fields: Field[]) {
+        for (const ref of refs) {
             const type = ref.type;
             if (type.code.includes(name)) {
                 const isSimpleMemberAccess = ref.parent instanceof MemberAccess;
