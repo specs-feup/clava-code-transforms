@@ -430,7 +430,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                 const hasMalloc = Query.searchFromInclusive(rhs, Call, { name: "malloc" }).get().length > 0;
                 const lhsHasRef = Query.searchFromInclusive(lhs, Varref).get().some((l) => l.type != null ? l.type.code.includes(name) : false);
                 const rhsHasRef = Query.searchFromInclusive(rhs, Varref).get().some((r) => r.type != null ? r.type.code.includes(name) : false);
-                const hasNullptr = rhs.code.replace(" ", "").includes("(void*) 0") || rhs.code.replace(" ", "").includes("NULL");
+                const hasNullptr = rhs.code.replace(" ", "").includes("(void*) 0") || rhs.code.replace(" ", "").includes("NULL") || rhs.code == "0";
 
                 if (hasMalloc && lhsHasRef) {
                     this.flattenMallocAssignment(assign, fields, name);
@@ -747,11 +747,12 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
                     let init: Expression;
                     if (arg.type.isPointer) {
+                        const actualName = arg.type.code.includes("**") ? `(*${strippedArgName})` : strippedArgName;
                         if (field.type.isArray) {
-                            init = ClavaJoinPoints.exprLiteral(`${strippedArgName}->${field.name}`);
+                            init = ClavaJoinPoints.exprLiteral(`${actualName}->${field.name}`);
                         }
                         else {
-                            init = ClavaJoinPoints.exprLiteral(`&(${strippedArgName}->${field.name})`);
+                            init = ClavaJoinPoints.exprLiteral(`&(${actualName}->${field.name})`);
                         }
                     }
                     else {
