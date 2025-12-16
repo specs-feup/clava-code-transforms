@@ -324,7 +324,13 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             }
 
             // foo = bar != nullptr
-            if (ref.parent instanceof BinaryOp && (ref.parent.operator == "!=" || ref.parent.operator == "==")) {
+            let parentIsBinOp = false;
+            parentIsBinOp ||= ref.parent instanceof BinaryOp;
+            parentIsBinOp ||= ref.parent instanceof ParenExpr && ref.parent.parent instanceof BinaryOp;
+            parentIsBinOp ||= ref.parent instanceof UnaryOp && ref.parent.parent instanceof ParenExpr && ref.parent.parent.parent instanceof BinaryOp;
+            const op = ref.getAncestor("binaryOp") as BinaryOp;
+
+            if (parentIsBinOp && (op.operator == "!=" || op.operator == "==")) {
                 const newRef = ClavaJoinPoints.exprLiteral(`${ref.name}_${fields[0].name}`);
                 ref.replaceWith(newRef);
                 changes++;
