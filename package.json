@@ -58,7 +58,8 @@
     "./Outliner": "./dist/src/function/Outliner.js",
     "./ScopeFlattener": "./dist/src/flattening/ScopeFlattener.js",
     "./StructFlattener": "./dist/src/flattening/StructFlattener.js",
-    "./Voidifier": "./dist/src/function/Voidifier.js"
+    "./Voidifier": "./dist/src/function/Voidifier.js",
+    "./VectorReduceSimplification": "./dist/src/vectorreduce/VectorReduceSimplification.js"
   },
   "files": [
     "dist/src"
