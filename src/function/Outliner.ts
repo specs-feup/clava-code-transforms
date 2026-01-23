@@ -646,7 +646,6 @@ export class Outliner extends AdvancedTransform {
             stmt.detach();
             scope.insertEnd(stmt);
         }
-
         // make sure scalar refs are now dereferenced pointers to params
         this.scalarsToPointers(params, varrefs);
         return fun;

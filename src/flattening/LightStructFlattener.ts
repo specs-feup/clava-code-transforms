@@ -210,11 +210,25 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
     private flattenMemberRefs(fun: FunctionJp, fields: Field[], name: string): number {
         let changes = 0;
+        this.sanitizeRefs(fun);
 
+        const regularRefs = Query.searchFrom(fun, Varref).get();
+        changes = this.flattenRefList(regularRefs, name, changes, fields);
+
+        return changes;
+    }
+
+    private sanitizeRefs(fun: FunctionJp) {
+        for (const memberAcc of Query.searchFrom(fun, MemberAccess).get()) {
+            if (memberAcc.children.length == 1 && memberAcc.children[0] instanceof ParenExpr) {
+                const baseExpr = memberAcc.children[0].children[0];
+                memberAcc.children[0].replaceWith(baseExpr);
+            }
+        }
         for (const arrAcc of Query.searchFrom(fun, ArrayAccess).get()) {
             for (let i = 1; i < arrAcc.children.length; i++) {
                 const child = arrAcc.children[i];
-                if (child instanceof MemberAccess) {
+                if (Query.searchFromInclusive(child, MemberAccess).get().length > 0) {
                     const tmpName = IdGenerator.next("__idxExpr");
                     const newDecl = ClavaJoinPoints.varDecl(tmpName, child.copy());
                     const declStmt = ClavaJoinPoints.declStmt(newDecl);
@@ -225,11 +239,22 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                 }
             }
         }
+        // for (const binOp of Query.searchFrom(fun, BinaryOp).get()) {
+        //     if (binOp.operator == "=" && binOp.right.code.includes("gss_i")) {
+        //         let jp = binOp.right;
+        //         // print jp.joinPointType and recursively for its children
+        //         // depth-first traversal
+        //         const printJp = (jp: any, depth: number) => {
+        //             const indent = "  ".repeat(depth);
+        //             this.log(`${indent}${jp.joinPointType}: ${jp.code}`);
+        //             for (const child of jp.children) {
+        //                 printJp(child, depth + 1);
+        //             }
+        //         };
+        //         printJp(jp, 0);
+        //     }
+        // }
 
-        const regularRefs = Query.searchFrom(fun, Varref).get();
-        changes = this.flattenRefList(regularRefs, name, changes, fields);
-
-        return changes;
     }
 
     private flattenRefList(refs: Varref[], name: string, changes: number, fields: Field[]) {
@@ -350,6 +375,8 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             let parentIsBinOp = false;
             parentIsBinOp ||= ref.parent instanceof BinaryOp;
             parentIsBinOp ||= ref.parent instanceof ParenExpr && ref.parent.parent instanceof BinaryOp;
+            parentIsBinOp ||= ref.parent instanceof ArrayAccess && ref.parent.parent instanceof BinaryOp;
+            parentIsBinOp ||= ref.parent instanceof ArrayAccess && ref.parent.parent instanceof ParenExpr && ref.parent.parent.parent instanceof BinaryOp;
             parentIsBinOp ||= ref.parent instanceof UnaryOp && ref.parent.parent instanceof ParenExpr && ref.parent.parent.parent instanceof BinaryOp;
             const op = ref.getAncestor("binaryOp") as BinaryOp;
 
