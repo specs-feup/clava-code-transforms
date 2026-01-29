@@ -16,6 +16,11 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     public flatten(fields: Field[], name: string, functions: FunctionJp[]): void {
         let nChanges = 0;
 
+        const updatedMallocs = this.updateMallocs(functions);
+        if (updatedMallocs > 0) {
+            this.log(`Updated ${updatedMallocs} malloc calls to use a predefined size via pragmas`);
+        }
+
         functions.forEach((fun) => {
             nChanges += this.flattenInFunction(fun, fields, name);
         });
@@ -29,6 +34,34 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
     }
 
     // -----------------------------------------------------------------------
+    private updateMallocs(functions: FunctionJp[]): number {
+        let n = 0;
+        for (const fun of functions) {
+            for (const call of Query.searchFrom(fun, Call, { name: "malloc" }).get()) {
+                if (call.argList[0] instanceof IntLiteral) {
+                    continue;
+                }
+                const parentStmt = call.getAncestor("statement") as Statement;
+                const pragma = parentStmt.leftJp!;
+
+                let size = 10000000; // default size if not found, 10MB
+                if (pragma == null || !pragma.code.includes("#pragma clava malloc_size")) {
+                    this.logWarning(`  Could not find malloc_size pragma for malloc():${call.line}`);
+                    this.logWarning(pragma.code);
+                    this.logWarning(`    Assuming size of ${size}`);
+                }
+                else {
+                    size = Number(pragma.code.match(/max\s*=\s*(-?\d+)/i)?.[1]);
+                    this.log(`  Size of malloc():${call.line} = ${size}`);
+                }
+                const intLit = ClavaJoinPoints.integerLiteral(size);
+                call.setArg(0, intLit);
+                n++;
+            }
+        }
+        return n;
+    }
+
     private flattenGlobals(fields: Field[], name: string): number {
         let changes = 0;
         this.logLine();
@@ -56,6 +89,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         this.logLine();
         this.log(`Flattening struct ${name} in function ${fun.name}`);
         let changes = 0;
+        const arraysOfStructs = this.findAllArraysOfStructs(fun, name);
 
         // update signature if it has a double pointer to a struct
         changes += this.ensureNoDoublePointers(fun, fields, name);
@@ -66,7 +100,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
         // assignments to struct variables
         changes += this.flattenNullComparison(fun, fields, name);
-        changes += this.flattenAssignments(fun, fields, name);
+        changes += this.flattenAssignments(fun, fields, name, arraysOfStructs);
 
         // declarations of struct variables
         changes += this.flattenParams(fun, fields, name);
@@ -78,6 +112,21 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             this.log(`No occurrences of struct ${name} found in function ${fun.name}`);
         }
         return changes;
+    }
+
+    private findAllArraysOfStructs(fun: FunctionJp, name: string): string[] {
+        const uniqueSymbols = new Set<string>();
+
+        Query.searchFrom(fun, Varref).get().forEach((ref) => {
+            const type = ref.type;
+            if (this.getBaseType(type).code != name) {
+                return;
+            }
+            if (this.isArrayOfStructs(ref)) {
+                uniqueSymbols.add(ref.name);
+            }
+        });
+        return Array.from(uniqueSymbols);
     }
 
     private ensureNoDoublePointers(fun: FunctionJp, fields: Field[], name: string): number {
@@ -449,7 +498,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         return declStmts;
     }
 
-    private flattenAssignments(fun: FunctionJp, fields: Field[], name: string): number {
+    private flattenAssignments(fun: FunctionJp, fields: Field[], name: string, arraysOfStructs: string[]): number {
         let changes = 0;
 
         const refs = Query.searchFrom(fun, Varref).get();
@@ -483,7 +532,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                 const hasNullptr = rhs.code.replace(" ", "").includes("(void*) 0") || rhs.code.replace(" ", "").includes("NULL") || rhs.code == "0";
 
                 if (hasMalloc && lhsHasRef) {
-                    this.flattenMallocAssignment(assign, fields, name);
+                    this.flattenMallocAssignment(assign, fields, name, arraysOfStructs);
                 }
                 else if (lhsHasRef && rhsHasRef) {
                     this.flattenStructPointerAssignment(assign, fields, name);
@@ -504,18 +553,81 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         return changes;
     }
 
-    private flattenMallocAssignment(assign: BinaryOp, fields: Field[], name: string): void {
+    private getSizeOfBuiltinType(type: Type): number {
+        const typeCode = type.desugarAll.code;
+        switch (typeCode) {
+            case "char":
+            case "unsigned char":
+            case "signed char":
+                return 1;
+            case "short":
+            case "unsigned short":
+                return 2;
+            case "int":
+            case "unsigned int":
+            case "float":
+                return 4;
+            case "long":
+            case "unsigned long":
+            case "double":
+                return 8;
+            case "long long":
+            case "unsigned long long":
+                return 16;
+            default:
+                this.logWarning(`    Unknown builtin type size for type: ${typeCode}, assuming size 4`);
+                return 4;
+        }
+    }
+
+    private isArrayOfStructs(varref: Varref): boolean {
+        const parentFun = varref.getAncestor("function") as FunctionJp;
+        const allVarrefs = Query.searchFrom(parentFun, Varref, { name: varref.name }).get();
+        return allVarrefs.some((vr) => {
+            const parent = vr.parent;
+            const grandparent = parent?.parent;
+            return (parent instanceof ArrayAccess) && (grandparent instanceof MemberAccess);
+        });
+    }
+
+    private flattenMallocAssignment(assign: BinaryOp, fields: Field[], name: string, arraysOfStructs: string[]): void {
         const parentStmt = assign.getAncestor("statement") as Statement;
         const lhs = assign.left;
         const rhs = assign.right;
         const malloc = Query.searchFromInclusive(rhs, Call, { name: "malloc" }).first()!;
+        const size = (malloc.args[0] as IntLiteral).value;
+        const isArrayOfStructs = arraysOfStructs.includes(lhs.code);
 
-        const sizeExpr = malloc.args[0];
-        const sizeVarName = IdGenerator.next("malloc_size");
-        const sizeVar = ClavaJoinPoints.varDecl(sizeVarName, sizeExpr);
-        sizeVar.setType(ClavaJoinPoints.type("size_t"));
-        const sizeDeclStmt = ClavaJoinPoints.declStmt(sizeVar);
-        parentStmt.insertBefore(sizeDeclStmt);
+        let scalarSizes = 0;
+        let arrayFieldCount = 0;
+
+        if (!isArrayOfStructs) {
+            // this only works if the struct has only one pointer-array field at most
+            for (const field of fields) {
+                if (field.type.isArray || field.type.isPointer) {
+                    arrayFieldCount++;
+                }
+                else {
+                    scalarSizes += this.getSizeOfBuiltinType(field.type);
+                }
+            }
+            if (arrayFieldCount > 1) {
+                this.logWarning(`    Struct has multiple array/pointer fields, assuming each is as large as the malloc size sans scalars`);
+            }
+        }
+        else {
+            this.log(`    Detected malloc for array of structs for variable ${lhs.code}`);
+        }
+
+        let structSize = 0;
+        for (const field of fields) {
+            if (field.type.isArray || field.type.isPointer) {
+                structSize += 4;
+            }
+            else {
+                structSize += this.getSizeOfBuiltinType(field.type);
+            }
+        }
 
         for (const field of fields) {
             const newLhsName = `${lhs.code}_${field.name}`;
@@ -525,27 +637,23 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             const newLhs = ClavaJoinPoints.exprLiteral(newLhsName);
             newLhs.setType(newLhsType);
 
-            let fieldSizeExpr: Expression;
-            if (field.type.isArray) {
-                const sizes = [sizeVarName];
-                for (const otherField of fields) {
-                    if (otherField.name === field.name) {
-                        break;
-                    }
-                    sizes.push(`sizeof(${this.getBaseType(otherField.type).code})`);
-                }
-                if (sizes.length > 1) {
-                    fieldSizeExpr = ClavaJoinPoints.exprLiteral(sizes.join(" - "));
+            let fieldSize = -1;
+            if (!isArrayOfStructs) {
+                if (field.type.isArray || field.type.isPointer) {
+                    const arraySize = size - scalarSizes;
+                    fieldSize = arraySize;
                 }
                 else {
-                    fieldSizeExpr = ClavaJoinPoints.exprLiteral(sizes[0]);
+                    fieldSize = this.getSizeOfBuiltinType(field.type);
                 }
             }
             else {
-                fieldSizeExpr = ClavaJoinPoints.exprLiteral(`sizeof(${baseType.code})`);
+                const nElems = size / structSize;
+                fieldSize = nElems * this.getSizeOfBuiltinType(baseType);
             }
 
-            const newMalloc = ClavaJoinPoints.callFromName("malloc", ClavaJoinPoints.pointer(baseType), fieldSizeExpr);
+            const sizeLit = ClavaJoinPoints.integerLiteral(fieldSize);
+            const newMalloc = ClavaJoinPoints.callFromName("malloc", ClavaJoinPoints.pointer(baseType), sizeLit);
             const newAssign = ClavaJoinPoints.binaryOp("=", newLhs, newMalloc);
 
             parentStmt.insertBefore(ClavaJoinPoints.exprStmt(newAssign));
