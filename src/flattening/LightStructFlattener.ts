@@ -1,11 +1,8 @@
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js"
-import { ArrayAccess, ArrayType, BinaryOp, Body, Call, Cast, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, PointerType, Scope, Statement, StorageClass, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
-import Clava from "@specs-feup/clava/api/clava/Clava.js";
+import { ArrayAccess, ArrayType, BinaryOp, Call, DeclStmt, Expression, ExprStmt, Field, FunctionJp, IncompleteArrayType, IntLiteral, MemberAccess, Param, ParenExpr, PointerType, Statement, StorageClass, Type, UnaryOp, Vardecl, VariableArrayType, Varref } from "@specs-feup/clava/api/Joinpoints.js"
 import { StructFlatteningAlgorithm } from "./StructFlatteningAlgorithm.js";
-import { Voidifier } from "../function/Voidifier.js";
 import IdGenerator from "@specs-feup/lara/api/lara/util/IdGenerator.js";
-import { VisualizationTool } from "@specs-feup/clava-visualization/api/VisualizationTool.js";
 
 export class LightStructFlattener extends StructFlatteningAlgorithm {
     constructor(silent: boolean = false) {
@@ -186,9 +183,23 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                     continue;
                 }
 
+                const pragma = fun.body.stmts.find(s => {
+                    if (s == undefined) {
+                        return false;
+                    }
+                    if (!s.code.startsWith("#pragma clava param =")) {
+                        return false;
+                    }
+                    const split = s.code.split(" ");
+                    const paramName = split[4];
+                    return param.name.startsWith(paramName);
+                });
+                const interfaceSize = this.getSizeOfInterfaceParam(fun, param.name);
+                const size = interfaceSize == -1 ? `sizeof(${this.getBaseType(rhs.type).code})` : `${interfaceSize}`;
+
                 const argDest = ClavaJoinPoints.varRef(`${param.name}`, param.type);
                 const argSrc = ClavaJoinPoints.varRef(`${(rhs as Varref).name}`, rhs.type);
-                const argSize = ClavaJoinPoints.exprLiteral(`sizeof(${this.getBaseType(rhs.type).code})`);
+                const argSize = ClavaJoinPoints.exprLiteral(size);
                 const memcpyCall = ClavaJoinPoints.callFromName("memcpy", ClavaJoinPoints.type("void"), argDest, argSrc, argSize);
                 const memcpyStmt = ClavaJoinPoints.exprStmt(memcpyCall);
 
@@ -206,6 +217,29 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         }
         fun.setParams(newParams);
         return changes;
+    }
+
+    private getSizeOfInterfaceParam(fun: FunctionJp, name: string): number {
+        const pragma = fun.body.stmts.find(s => {
+            if (s == undefined) {
+                return false;
+            }
+            const code = s.code.trim();
+            if (!code.startsWith("#pragma clava param =") && !code.startsWith("#pragma clava param=")) {
+                return false;
+            }
+            const split = code.split("=");
+            const paramName = split[1].split(" ")[0];
+            console.log(paramName);
+            return name.startsWith(paramName);
+        });
+        if (pragma != null) {
+            const match = pragma.code.match(/size\s*=\s*(-?\d+)/i);
+            if (match) {
+                return Number(match[1]);
+            }
+        }
+        return -1;
     }
 
     private flattenParams(fun: FunctionJp, fields: Field[], name: string): number {
@@ -732,6 +766,23 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         if (!srcArg.type.code.includes(name) || !destArg.type.code.includes(name)) {
             return changes;
         }
+        const parenFun = call.getAncestor("function") as FunctionJp;
+        const interfaceSize = this.getSizeOfInterfaceParam(parenFun, destArg.code);
+
+        let scalarSizes = 0;
+        let arrayFieldCount = 0;
+
+        for (const field of fields) {
+            if (field.type.isArray || field.type.isPointer) {
+                arrayFieldCount++;
+            }
+            else {
+                scalarSizes += this.getSizeOfBuiltinType(field.type);
+            }
+        }
+        if (arrayFieldCount > 1) {
+            this.logWarning(`    Struct has multiple array/pointer fields, assuming each is as large as the memcpy size sans scalars`);
+        }
 
         const newSrcArgs = this.flattenCallArg(srcArg, fields);
         const newDestArgs = this.flattenCallArg(destArg, fields);
@@ -742,7 +793,16 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             const newSrcArg = newSrcArgs[i];
             const newDestArg = newDestArgs[i];
 
-            const sizeExpr = ClavaJoinPoints.exprLiteral(`sizeof(${this.getBaseType(field.type).code})`);
+            let size = 4;
+            if (interfaceSize != -1) {
+                if (field.type.isArray || field.type.isPointer) {
+                    size = interfaceSize - scalarSizes;
+                }
+                else {
+                    size = this.getSizeOfBuiltinType(field.type);
+                }
+            }
+            const sizeExpr = ClavaJoinPoints.integerLiteral(size);
             const newMemcpyCall = ClavaJoinPoints.callFromName("memcpy", ClavaJoinPoints.type("void"), newDestArg, newSrcArg, sizeExpr);
             newCalls.push(newMemcpyCall);
         }
@@ -839,34 +899,44 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         return newArgs;
     }
 
+    private updateCallToFree(call: Call, newArgs: Expression[], fields: Field[], turnIntoComment: boolean = true): void {
+        if (turnIntoComment) {
+            const parentStmt = call.getAncestor("statement") as Statement;
+            const commented = ClavaJoinPoints.stmtLiteral(`/* ${parentStmt.code} */`);
+            parentStmt.replaceWith(commented);
+            return;
+        }
+        if (newArgs.length > 1) {
+            const parentExpr = call.parent;
+            if (!(parentExpr instanceof ExprStmt)) {
+                throw new Error(`Expected parent of free call to be an ExprStmt, but got ${parentExpr?.joinPointType}`);
+            }
+
+            const newCalls: ExprStmt[] = [];
+            fields.forEach((field, index) => {
+                if (field.type.isPointer || field.type.isArray) {
+                    const funName = "free";
+                    const funRetType = ClavaJoinPoints.type("void");
+                    const arg = newArgs[index];
+
+                    const newCall = ClavaJoinPoints.callFromName(funName, funRetType, arg);
+                    const newExpr = ClavaJoinPoints.exprStmt(newCall);
+                    newCalls.push(newExpr);
+                }
+            });
+            newCalls.forEach((newCall) => {
+                parentExpr.insertBefore(newCall);
+            });
+            parentExpr.detach();
+        }
+        else {
+            call.setArg(0, newArgs[0]);
+        }
+    }
+
     private updateCallWithNewArgs(call: Call, newArgs: Expression[], fields: Field[]): void {
         if (call.name == "free") {
-            if (newArgs.length > 1) {
-                const parentExpr = call.parent;
-                if (!(parentExpr instanceof ExprStmt)) {
-                    throw new Error(`Expected parent of free call to be an ExprStmt, but got ${parentExpr?.joinPointType}`);
-                }
-
-                const newCalls: ExprStmt[] = [];
-                fields.forEach((field, index) => {
-                    if (field.type.isPointer || field.type.isArray) {
-                        const funName = "free";
-                        const funRetType = ClavaJoinPoints.type("void");
-                        const arg = newArgs[index];
-
-                        const newCall = ClavaJoinPoints.callFromName(funName, funRetType, arg);
-                        const newExpr = ClavaJoinPoints.exprStmt(newCall);
-                        newCalls.push(newExpr);
-                    }
-                });
-                newCalls.forEach((newCall) => {
-                    parentExpr.insertBefore(newCall);
-                });
-                parentExpr.detach();
-            }
-            else {
-                call.setArg(0, newArgs[0]);
-            }
+            this.updateCallToFree(call, newArgs, fields, true);
         }
         else {
             const currNArgs = call.args.length;
