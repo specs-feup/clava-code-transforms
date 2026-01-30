@@ -464,8 +464,11 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             const op = ref.getAncestor("binaryOp") as BinaryOp;
 
             if (parentIsBinOp && (op.operator == "!=" || op.operator == "==")) {
-                const newRef = ClavaJoinPoints.exprLiteral(`${ref.name}_${fields[0].name}`);
-                ref.replaceWith(newRef);
+                const pointerField = fields.find((f) => f.type.isPointer || f.type.isArray);
+                const pointerFieldName = pointerField ? pointerField.name : fields[0].name;
+
+                const newRef = ClavaJoinPoints.exprLiteral(`${ref.name}_${pointerFieldName}`);
+                op.setLeft(newRef);
                 changes++;
                 this.log(`  Flattened struct ref ${ref.name} in null comparison`);
             }
@@ -919,9 +922,11 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                     const funRetType = ClavaJoinPoints.type("void");
                     const arg = newArgs[index];
 
-                    const newCall = ClavaJoinPoints.callFromName(funName, funRetType, arg);
+                    const varref = ClavaJoinPoints.exprLiteral(arg.code.replace("*", "").replace("&", "").trim());
+                    const newCall = ClavaJoinPoints.callFromName(funName, funRetType, varref);
                     const newExpr = ClavaJoinPoints.exprStmt(newCall);
                     newCalls.push(newExpr);
+
                 }
             });
             newCalls.forEach((newCall) => {
@@ -936,7 +941,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
 
     private updateCallWithNewArgs(call: Call, newArgs: Expression[], fields: Field[]): void {
         if (call.name == "free") {
-            this.updateCallToFree(call, newArgs, fields, true);
+            this.updateCallToFree(call, newArgs, fields, false);
         }
         else {
             const currNArgs = call.args.length;
