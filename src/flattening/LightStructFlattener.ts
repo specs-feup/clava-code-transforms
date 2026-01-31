@@ -183,19 +183,20 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                     continue;
                 }
 
-                const pragma = fun.body.stmts.find(s => {
-                    if (s == undefined) {
-                        return false;
-                    }
-                    if (!s.code.startsWith("#pragma clava param =")) {
-                        return false;
-                    }
-                    const split = s.code.split(" ");
-                    const paramName = split[4];
-                    return param.name.startsWith(paramName);
-                });
-                const interfaceSize = this.getSizeOfInterfaceParam(fun, param.name);
-                const size = interfaceSize == -1 ? `sizeof(${this.getBaseType(rhs.type).code})` : `${interfaceSize}`;
+                const destSize = this.getSizeOfInterfaceParam(fun, param.name);
+                const srcSize = this.getSizeOfLocalPointer(fun, Query.searchFromInclusive(rhs, Varref).get()[0]);
+
+                let size = `sizeof(${this.getBaseType(rhs.type).code})`;
+                if (destSize == -1 && srcSize > -1) {
+                    size = `${srcSize}`;
+                }
+                else if (srcSize == -1 && destSize > -1) {
+                    size = `${destSize}`;
+                }
+                else {
+                    size = destSize > srcSize ? `${srcSize}` : `${destSize}`;
+                }
+
 
                 const argDest = ClavaJoinPoints.varRef(`${param.name}`, param.type);
                 const argSrc = ClavaJoinPoints.varRef(`${(rhs as Varref).name}`, rhs.type);
@@ -217,6 +218,33 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         }
         fun.setParams(newParams);
         return changes;
+    }
+
+    private getSizeOfLocalPointer(fun: FunctionJp, varref: Varref): number {
+        for (const decl of Query.searchFrom(fun, Vardecl, { name: varref.name }).get()) {
+            if (decl.parent instanceof BinaryOp && decl.parent.operator === "=") {
+                if (decl.parent.right instanceof Call && decl.parent.right.name === "malloc") {
+                    const mallocCall = decl.parent.right as Call;
+                    if (mallocCall.argList[0] instanceof IntLiteral) {
+                        return (mallocCall.argList[0] as IntLiteral).value;
+                    }
+                }
+            }
+        }
+        for (const ref of Query.searchFrom(fun, Varref, { name: varref.name }).get()) {
+            if (ref.parent instanceof BinaryOp && ref.parent.operator === "=") {
+                const op = ref.parent as BinaryOp;
+                const varrefs = Query.searchFromInclusive(op.right, Varref).get();
+                const inits = varrefs.map((r => this.getSizeOfLocalPointer(fun, r))).filter(s => s != -1);
+                if (inits.length > 0) {
+                    return Math.max(...inits);
+                }
+                else {
+                    return -1;
+                }
+            }
+        }
+        return -1;
     }
 
     private getSizeOfInterfaceParam(fun: FunctionJp, name: string): number {
