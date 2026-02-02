@@ -1,4 +1,4 @@
-import { BinaryOp, Call, ExprStmt, FileJp, FunctionJp, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
+import { BinaryOp, Call, ExprStmt, FileJp, FunctionJp, IntLiteral, WrapperStmt } from "@specs-feup/clava/api/Joinpoints.js";
 import Query from "@specs-feup/lara/api/weaver/Query.js";
 import { AHoister } from "./AHoister.js";
 import ClavaJoinPoints from "@specs-feup/clava/api/clava/ClavaJoinPoints.js";
@@ -136,6 +136,9 @@ export class MallocHoister extends AHoister {
 
 
     private getSize(call: Call): number {
+        if (call.args[0] instanceof IntLiteral) {
+            return call.args[0].value;
+        }
         const stmt = call.getAncestor("exprStmt") as ExprStmt;
         const prevSibling = stmt.siblingsLeft.at(-1);
         if (prevSibling != null && (prevSibling instanceof WrapperStmt)) {
