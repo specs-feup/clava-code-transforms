@@ -618,7 +618,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
         return changes;
     }
 
-    private getSizeOfBuiltinType(type: Type): number {
+    public static getSizeOfBuiltinType(type: Type): number {
         const typeCode = type.desugarAll.code;
         switch (typeCode) {
             case "char":
@@ -640,7 +640,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
             case "unsigned long long":
                 return 16;
             default:
-                this.logWarning(`    Unknown builtin type size for type: ${typeCode}, assuming size 4`);
+                console.log(`    Unknown builtin type size for type: ${typeCode}, assuming size 4`);
                 return 4;
         }
     }
@@ -673,7 +673,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                     arrayFieldCount++;
                 }
                 else {
-                    scalarSizes += this.getSizeOfBuiltinType(field.type);
+                    scalarSizes += LightStructFlattener.getSizeOfBuiltinType(field.type);
                 }
             }
             if (arrayFieldCount > 1) {
@@ -690,7 +690,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                 structSize += 4;
             }
             else {
-                structSize += this.getSizeOfBuiltinType(field.type);
+                structSize += LightStructFlattener.getSizeOfBuiltinType(field.type);
             }
         }
 
@@ -709,12 +709,12 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                     fieldSize = arraySize;
                 }
                 else {
-                    fieldSize = this.getSizeOfBuiltinType(field.type);
+                    fieldSize = LightStructFlattener.getSizeOfBuiltinType(field.type);
                 }
             }
             else {
                 const nElems = size / structSize;
-                fieldSize = nElems * this.getSizeOfBuiltinType(baseType);
+                fieldSize = nElems * LightStructFlattener.getSizeOfBuiltinType(baseType);
             }
 
             const sizeLit = ClavaJoinPoints.integerLiteral(fieldSize);
@@ -808,7 +808,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                 arrayFieldCount++;
             }
             else {
-                scalarSizes += this.getSizeOfBuiltinType(field.type);
+                scalarSizes += LightStructFlattener.getSizeOfBuiltinType(field.type);
             }
         }
         if (arrayFieldCount > 1) {
@@ -830,7 +830,7 @@ export class LightStructFlattener extends StructFlatteningAlgorithm {
                     size = interfaceSize - scalarSizes;
                 }
                 else {
-                    size = this.getSizeOfBuiltinType(field.type);
+                    size = LightStructFlattener.getSizeOfBuiltinType(field.type);
                 }
             }
             const sizeExpr = ClavaJoinPoints.integerLiteral(size);
