@@ -2,7 +2,7 @@
 woven_code/
 /dist
 /docs
-package-lock.json
+#package-lock.json
 
 # Extensions
 ltex.dictionary.*
