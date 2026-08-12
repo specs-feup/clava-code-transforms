@@ -5,7 +5,7 @@ import chalk from "chalk";
 
 export abstract class AdvancedTransform {
     private transformName: string = "AdvancedTransform";
-    private silent: boolean = false;
+    protected silent: boolean = false;
 
     constructor(name: string, silent?: boolean) {
         this.transformName = name;
