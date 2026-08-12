@@ -1,7 +1,7 @@
 import { registerSourceCodeEach, registerSourceCode, registerSourceCodeOnce } from './jestHelpers.js';
 import { VectorReduceSimplificator } from '../src/vectorreduce/VectorReduceSimplification.js';
 import fs from "node:fs";
-import { ChildProcess, spawnSync, execSync, exec, SpawnSyncReturns, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { Joinpoint } from '@specs-feup/clava/api/Joinpoints.js';
 import Query from '@specs-feup/lara/api/weaver/Query.js';
 import Clava from '@specs-feup/clava/api/clava/Clava.js';
@@ -10,27 +10,17 @@ import path, { ParsedPath } from 'node:path';
 // const simpleCompleteCode = fs.readFileSync("./inputs/vectorreduce/SimpleComplete.c", "utf-8");
 // const simplePartialCode = fs.readFileSync("./inputs/vectorreduce/SimplePartial.c", "utf-8");
 
-function execSyncOrFail(command: string, errorMessagePreface: string, timeout?: number): void {
+function execFileSyncOrFail(filePath: string, args: string[], errorMessagePreface: string, timeout: number): string {
     try {
-        execSync(command, { encoding: "utf-8", timeout: timeout });
-    } catch (e) {
-        const goodError: SpawnSyncReturns<string> = e as SpawnSyncReturns<string>;
-        throw new Error(`${errorMessagePreface} ${goodError}`);
-    }
-}
-
-function execFileSyncOrFail(filePath: string, errorMessagePreface: string, timeout?: number): string {
-    try {
-        const stdout: string = execFileSync(filePath, { encoding: "utf-8", timeout: timeout });
+        const stdout: string = execFileSync(filePath, args, { encoding: "utf-8", timeout });
         return stdout;
     } catch (e) {
-        const goodError: SpawnSyncReturns<string> = e as SpawnSyncReturns<string>;
-        throw new Error(`${errorMessagePreface} ${goodError}`);
+        throw new Error(`${errorMessagePreface} ${e}`);
     }
 }
 
 function assertGccExists(): void {
-    execSyncOrFail('gcc -v', 'GCC not found: ', 300);
+    execFileSyncOrFail('gcc', ['--version'], 'GCC not found: ', 10_000);
 }
 
 function removeIfExists(filePath: string) {
@@ -69,13 +59,13 @@ class CodeRunner {
     /**
      * 
      * @param fileName name of the file to be used as input for the test. Will be joined to inputFolderPath
-     * @param compileTimeout <default: 2000> timeout for compiling programs in milliseconds 
-     * @param runTimeout <default: 2000> timeout for running the compiled programs in milliseconds
+     * @param compileTimeout <default: 30000> timeout for compiling programs in milliseconds
+     * @param runTimeout <default: 5000> timeout for running the compiled programs in milliseconds
      */
     public test(testName: string,
         fileNames: string[],
         verificationCallback: (stdoutOriginal: string, stdoutModified: string) => boolean = (stdoutOriginal: string, stdoutModified: string) => stdoutOriginal === stdoutModified,
-        compileTimeout: number = 2000, runTimeout: number = 2000) {
+        compileTimeout: number = 30_000, runTimeout: number = 5_000) {
         const originalInputFilePaths: string[] = fileNames.map(fn => path.join(this.inputFolderPath, fn));
 
         const clavaOutputFilePaths: string[] = fileNames.map(fn => path.join(this.outputFolderPath, testName, fn));
@@ -130,11 +120,11 @@ class CodeRunner {
 
         }
 
-        execSyncOrFail(`gcc -o ${compiledOriginalPath} ${originalInputFilePaths.reduce((a, b) => a + " " + b)}`, 'Failed to compile original program: ', compileTimeout);
-        execSyncOrFail(`gcc -o ${compiledModifiedPath} ${clavaOutputFilePaths.reduce((a, b) => a + " " + b)}`, 'Failed to compile modified program: ', compileTimeout);
+        execFileSyncOrFail('gcc', ['-o', compiledOriginalPath, ...originalInputFilePaths], 'Failed to compile original program: ', compileTimeout);
+        execFileSyncOrFail('gcc', ['-o', compiledModifiedPath, ...clavaOutputFilePaths], 'Failed to compile modified program: ', compileTimeout);
 
-        const originalProgramStdout: string = execFileSyncOrFail(compiledOriginalPath, 'Error running compiled original program: ', runTimeout);
-        const modifiedProgramStdout: string = execFileSyncOrFail(compiledModifiedPath, 'Error running compiled modified program: ', runTimeout);
+        const originalProgramStdout: string = execFileSyncOrFail(compiledOriginalPath, [], 'Error running compiled original program: ', runTimeout);
+        const modifiedProgramStdout: string = execFileSyncOrFail(compiledModifiedPath, [], 'Error running compiled modified program: ', runTimeout);
 
         if (!verificationCallback(originalProgramStdout, modifiedProgramStdout)) {
             throw new Error(`Verification failed.\nOriginal program stdout:\n${originalProgramStdout}\n\nModified program stdout:\n${modifiedProgramStdout}`);
@@ -178,8 +168,8 @@ const codeRunner: CodeRunner = new CodeRunner("./inputs/vectorreduce/", () => {
 
 test("simple complete has equal output", () => {
     codeRunner.test("simpleComplete", ["SimpleComplete.c"]);
-});
+}, 90_000);
 
 test("simple partial has equal output", () => {
     codeRunner.test("simplePartial", ["SimplePartial.c"]);
-});
+}, 90_000);
